@@ -1,6 +1,17 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
 <title>LiftVoice STT 현장 테스트</title>
 
 <style>
+  *, *::before, *::after { box-sizing: border-box; }
+  body, h1, h2, p, pre { margin: 0; }
+  button, input { font-family: inherit; color: inherit; }
+  pre { font-family: inherit; }
+
   :root {
     --bg: #EFF1F0;
     --surface: #FFFFFF;
@@ -430,6 +441,8 @@
     outline-offset: 2px;
   }
 </style>
+</head>
+<body>
 
 <div class="wrap">
 
@@ -944,3 +957,6 @@
   rec = buildRecognizer();
 })();
 </script>
+
+</body>
+</html>
