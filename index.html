@@ -193,6 +193,70 @@
     font-weight: 600;
   }
 
+  /* ---- script mode ---- */
+  .script-panel {
+    background: var(--surface);
+    border: 1px solid var(--accent);
+    border-radius: var(--r);
+    padding: 16px;
+    display: none;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .script-panel.show { display: flex; }
+
+  .script-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .skip {
+    font: inherit;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 8px 10px;
+    min-height: 44px;
+    border-radius: 8px;
+    border: 1px solid var(--line);
+    background: var(--surface-2);
+    color: var(--muted);
+    cursor: pointer;
+  }
+
+  .script-line {
+    font-size: clamp(1.5rem, 7vw, 2.25rem);
+    font-weight: 650;
+    line-height: 1.3;
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+    word-break: keep-all;
+  }
+
+  .script-result {
+    font-size: 15px;
+    color: var(--muted);
+    word-break: keep-all;
+    overflow-wrap: anywhere;
+    display: none;
+  }
+  .script-result.show { display: block; }
+  .script-result.ok { color: var(--good); font-weight: 600; }
+  .script-result.bad { color: var(--hot); }
+
+  .script-actions {
+    display: none;
+    gap: 8px;
+  }
+  .script-actions.show { display: flex; }
+  .script-actions .vbtn { flex: 1; }
+
   /* ---- live panel ---- */
   .live {
     background: var(--surface);
@@ -451,6 +515,24 @@
     <h1>헬스장 소음 한국어 인식 테스트</h1>
   </div>
 
+  <div class="chips" id="modes">
+    <button class="chip" type="button" data-m="free" aria-pressed="true">자유 발화</button>
+    <button class="chip" type="button" data-m="script" aria-pressed="false">스크립트 측정</button>
+  </div>
+
+  <div class="script-panel" id="script-panel">
+    <div class="script-meta">
+      <span id="script-progress">1 / 20</span>
+      <button class="skip" type="button" id="btn-skip">건너뛰기</button>
+    </div>
+    <div class="script-line" id="script-line"></div>
+    <div class="script-result" id="script-result"></div>
+    <div class="script-actions" id="script-actions">
+      <button class="vbtn no" type="button" id="btn-misheard">오인식</button>
+      <button class="vbtn" type="button" id="btn-misread">내가 잘못 읽음</button>
+    </div>
+  </div>
+
   <div class="banner" id="banner"></div>
 
   <div>
@@ -519,6 +601,167 @@
   var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   var STORE = "liftvoice.stt.v1";
 
+  var SCRIPT_LINES = [
+    "스쿼트 100 5개",
+    "벤치프레스 80 8개",
+    "데드리프트 140 3개",
+    "오버헤드프레스 45 10개",
+    "바벨로우 70 8개",
+    "레그프레스 180 12개",
+    "랫풀다운 60 12개",
+    "덤벨컬 15 12개",
+    "방금 세트 2.5키로 더",
+    "방금 세트 5키로 빼줘",
+    "다음은 덤벨로 대체",
+    "랙 없어서 고블릿 스쿼트로",
+    "지금 힘들어",
+    "휴식 90초",
+    "한 세트 더",
+    "이번 세트 실패",
+    "인클라인 벤치 60 10개",
+    "케이블 플라이 20 15개",
+    "런지 40 10개",
+    "플랭크 60초"
+  ];
+
+  var NUM_WORDS = {
+    "영": "0", "공": "0", "하나": "1", "한": "1", "일": "1", "둘": "2", "두": "2", "이": "2",
+    "셋": "3", "세": "3", "삼": "3", "넷": "4", "네": "4", "사": "4", "다섯": "5", "오": "5",
+    "여섯": "6", "육": "6", "일곱": "7", "칠": "7", "여덟": "8", "팔": "8", "아홉": "9", "구": "9",
+    "열": "10", "십": "10", "스물": "20", "이십": "20", "서른": "30", "삼십": "30",
+    "마흔": "40", "사십": "40", "쉰": "50", "오십": "50", "예순": "60", "육십": "60",
+    "일흔": "70", "칠십": "70", "여든": "80", "팔십": "80", "아흔": "90", "구십": "90",
+    "백": "100"
+  };
+
+  function normalize(text) {
+    var s = String(text == null ? "" : text).toLowerCase();
+    // Preserve decimal points: only strip periods NOT between digits
+    s = s.replace(/[.,!?~"'`·…\-]/g, function(match, offset, str) {
+      if (match === ".") {
+        var prevIsDigit = offset > 0 && /\d/.test(str[offset - 1]);
+        var nextIsDigit = offset < str.length - 1 && /\d/.test(str[offset + 1]);
+        if (prevIsDigit && nextIsDigit) {
+          return ".";
+        }
+      }
+      return " ";
+    });
+    s = s.replace(/kg|킬로그램|킬로|키로/g, "키로");
+    s = s.replace(/초간|초동안/g, "초");
+    var parts = s.split(/\s+/).filter(function (w) { return w.length > 0; });
+    var originals = parts.slice();
+
+    // Handle counter-attached number words (e.g., "다섯개" → "5개")
+    parts = parts.map(function (w) {
+      var match = w.match(/^(.+?)(개|초|키로)$/);
+      if (match) {
+        var prefix = match[1];
+        var counter = match[2];
+        if (Object.prototype.hasOwnProperty.call(NUM_WORDS, prefix)) {
+          return NUM_WORDS[prefix] + counter;
+        }
+        if (/^\d+\.?\d*$/.test(prefix)) {
+          return prefix + counter;
+        }
+      }
+      return Object.prototype.hasOwnProperty.call(NUM_WORDS, w) ? NUM_WORDS[w] : w;
+    });
+
+    // Combine adjacent number tokens ONLY if both were originally Korean words
+    // Never merge if either has a unit suffix or was originally a digit
+    var combined = [];
+    for (var i = 0; i < parts.length; i++) {
+      if (i < parts.length - 1) {
+        var origCurr = originals[i];
+        var origNext = originals[i + 1];
+
+        // Only merge if BOTH original tokens are Korean words (not digits) with no suffixes
+        var currIsKoreanWord = !/^\d/.test(origCurr);
+        var nextIsKoreanWord = !/^\d/.test(origNext);
+        var currHasSuffix = /[개초키로]$/.test(origCurr);
+        var nextHasSuffix = /[개초키로]$/.test(origNext);
+
+        if (currIsKoreanWord && nextIsKoreanWord && !currHasSuffix && !nextHasSuffix) {
+          var curr = parts[i];
+          var next = parts[i + 1];
+          var currNum = parseInt(curr, 10);
+          var nextNum = parseInt(next, 10);
+
+          if (!isNaN(currNum) && !isNaN(nextNum)) {
+            if (currNum >= 10 && currNum < 100 && currNum % 10 == 0 && nextNum < 10) {
+              combined.push(String(currNum + nextNum));
+              i++;
+              continue;
+            }
+          }
+        }
+      }
+      combined.push(parts[i]);
+    }
+    parts = combined;
+
+    // Merge numeric tokens with following unit suffixes
+    var filtered = [];
+    for (var i = 0; i < parts.length; i++) {
+      var curr = parts[i];
+      var isUnit = curr === "개" || curr === "초" || curr === "키로";
+
+      if (isUnit && filtered.length > 0) {
+        var prev = filtered[filtered.length - 1];
+        var prevNum = parseInt(prev, 10);
+        if (!isNaN(prevNum)) {
+          filtered[filtered.length - 1] = prev + curr;
+          continue;
+        }
+      }
+      filtered.push(curr);
+    }
+    parts = filtered;
+
+    // Join with separator to preserve number boundaries
+    return parts.join("|");
+  }
+
+  function isMatch(expected, heard) {
+    return normalize(expected) === normalize(heard);
+  }
+
+  function selfTest() {
+    var cases = [
+      ["스쿼트 100 5개", "스쿼트 100 5개", true],
+      ["스쿼트 100 5개", "스쿼트 100 5개.", true],
+      ["스쿼트 100 5개", "스쿼트 백 다섯 개", true],
+      ["스쿼트 100 5개", "스쿼트 100 6개", false],
+      ["스쿼트 100 5개", "스쿼드 100 5개", false],
+      ["방금 세트 2.5키로 더", "방금 세트 2.5kg 더", true],
+      ["방금 세트 2.5키로 더", "방금 세트 2.5 킬로 더", true],
+      ["휴식 90초", "휴식 90초", true],
+      ["휴식 90초", "휴식 구십 초", true],
+      ["플랭크 60초", "플랭크 60초간", true],
+      ["지금 힘들어", "지금 힘들어", true],
+      ["지금 힘들어", "지금 힘들어요", false],
+      ["스쿼트 10 25개", "스쿼트 102 5개", false],
+      ["스쿼트 100 5개", "스쿼트 백 다섯개", true],
+      ["오버헤드프레스 45 10개", "오버헤드프레스 마흔 다섯 10개", true],
+      ["벤치프레스 80 8개", "벤치프레스 88", false],
+      ["바벨로우 70 8개", "바벨로우 78", false],
+      ["스쿼트 20 5개", "스쿼트 25", false],
+      ["방금 세트 2.5키로 더", "방금 세트 2 5키로 더", false]
+    ];
+    var pass = 0, fail = 0, failures = [];
+    cases.forEach(function (c) {
+      var got = isMatch(c[0], c[1]);
+      if (got === c[2]) {
+        pass++;
+      } else {
+        fail++;
+        failures.push('"' + c[0] + '" vs "' + c[1] + '" → ' + got + ", 기대 " + c[2]);
+      }
+    });
+    return { pass: pass, fail: fail, failures: failures };
+  }
+
   var el = {
     banner: document.getElementById("banner"),
     conds: document.getElementById("conds"),
@@ -534,14 +777,29 @@
     sRate: document.getElementById("s-rate"),
     exportBox: document.getElementById("export"),
     btnExport: document.getElementById("btn-export"),
-    btnClear: document.getElementById("btn-clear")
+    btnClear: document.getElementById("btn-clear"),
+    modes: document.getElementById("modes"),
+    scriptPanel: document.getElementById("script-panel"),
+    scriptProgress: document.getElementById("script-progress"),
+    scriptLine: document.getElementById("script-line"),
+    scriptResult: document.getElementById("script-result"),
+    scriptActions: document.getElementById("script-actions"),
+    btnSkip: document.getElementById("btn-skip"),
+    btnMisheard: document.getElementById("btn-misheard"),
+    btnMisread: document.getElementById("btn-misread")
   };
 
   var state = {
     listening: false,     // user intent: should we be capturing
     running: false,       // engine actually running
     condition: "조용",
-    entries: []
+    entries: [],
+    mode: "free",
+    scriptIndex: 0,
+    pendingHeard: "",
+    scriptScored: false,
+    scriptGen: 0,
+    scriptTimer: null
   };
 
   var rec = null;
@@ -704,6 +962,108 @@
     renderStats();
   }
 
+  function renderScript() {
+    el.scriptPanel.classList.toggle("show", state.mode === "script");
+    if (state.mode !== "script") return;
+
+    if (state.scriptIndex >= SCRIPT_LINES.length) {
+      el.scriptLine.textContent = "측정 완료";
+      el.scriptProgress.textContent = SCRIPT_LINES.length + " / " + SCRIPT_LINES.length;
+      el.scriptResult.className = "script-result show";
+      el.scriptResult.textContent = "결과 보기 / 복사를 눌러 결과를 회수하세요.";
+      el.scriptActions.classList.remove("show");
+      return;
+    }
+
+    el.scriptLine.textContent = SCRIPT_LINES[state.scriptIndex];
+    el.scriptProgress.textContent = (state.scriptIndex + 1) + " / " + SCRIPT_LINES.length;
+    el.scriptResult.className = "script-result";
+    el.scriptResult.textContent = "";
+    el.scriptActions.classList.remove("show");
+  }
+
+  function advanceScript() {
+    // Bumping the generation and clearing any pending timer is what makes
+    // a stale auto-advance (Critical 1) and a stale re-read (Critical 2)
+    // harmless: the timer's captured generation and index no longer match,
+    // and a freshly-shown line is unscored again.
+    clearTimeout(state.scriptTimer);
+    state.scriptTimer = null;
+    state.scriptGen++;
+    state.scriptIndex++;
+    state.pendingHeard = "";
+    state.scriptScored = false;
+    renderScript();
+  }
+
+  // 확정 결과를 기대 문장과 대조한다. 일치하면 사용자가 아무것도 하지
+  // 않아도 다음으로 넘어가고, 불일치일 때만 판정을 요구한다.
+  function handleScriptResult(heard) {
+    if (state.scriptIndex >= SCRIPT_LINES.length) return;
+    // Re-entrancy guard (Important 3): once the current line has been
+    // scored, ignore further final results until advanceScript() runs.
+    if (state.scriptScored) return;
+    var expected = SCRIPT_LINES[state.scriptIndex];
+    state.pendingHeard = heard;
+
+    if (isMatch(expected, heard)) {
+      state.scriptScored = true;
+      recordScript(expected, heard, "correct");
+      el.scriptResult.className = "script-result show ok";
+      el.scriptResult.textContent = "일치 ✓";
+      // Critical 2: hide any stale mismatch buttons left over from a
+      // previous mismatched attempt on this same line, so a re-read that
+      // now matches can't be double-recorded via a leftover tap.
+      el.scriptActions.classList.remove("show");
+
+      var expectedIndex = state.scriptIndex;
+      var expectedGen = state.scriptGen;
+      clearTimeout(state.scriptTimer);
+      state.scriptTimer = setTimeout(function () {
+        // Critical 1 (round 1) + round-2 fix: advance whenever nothing has
+        // moved the script on since this timer was scheduled (skip,
+        // mismatch-advance, or another match). Deliberately NOT gated on
+        // state.mode === "script": line N was legitimately scored, so
+        // advancing to N+1 is correct even if the panel is currently
+        // hidden (mode switched to free and never/late returned) — the
+        // advance is invisible while the panel is hidden and simply
+        // reflects reality once the user comes back. Gating on mode was
+        // the round-1 bug: if the user left script mode and the timer
+        // fired while away, the gate suppressed the only call that resets
+        // scriptScored, permanently freezing the line (round-2 Critical).
+        // The index/generation check alone is sufficient to prevent a
+        // stale timer from double-advancing.
+        if (state.scriptIndex === expectedIndex &&
+            state.scriptGen === expectedGen) {
+          advanceScript();
+        }
+      }, 700);
+      return;
+    }
+
+    el.scriptResult.className = "script-result show bad";
+    el.scriptResult.textContent = "인식: " + heard;
+    el.scriptActions.classList.add("show");
+  }
+
+  function recordScript(expected, heard, verdict) {
+    var now = new Date();
+    state.entries.push({
+      id: String(now.getTime()) + Math.random().toString(36).slice(2, 6),
+      time: now.toTimeString().slice(0, 8),
+      date: now.toISOString(),
+      condition: state.condition,
+      mode: "script",
+      expected: expected,
+      text: heard,
+      verdict: verdict,
+      truth: verdict === "wrong" ? expected : ""
+    });
+    save();
+    renderLog();
+    renderStats();
+  }
+
   /* ---------- engine ---------- */
 
   function buildRecognizer() {
@@ -731,8 +1091,12 @@
         }
       }
       if (finalText) {
-        addEntry(finalText);
         renderTranscript(finalText.trim(), "");
+        if (state.mode === "script") {
+          handleScriptResult(finalText.trim());
+        } else {
+          addEntry(finalText);
+        }
       } else {
         renderTranscript("", interimText);
       }
@@ -859,6 +1223,26 @@
 
   el.rec.addEventListener("click", toggle);
 
+  el.modes.addEventListener("click", function (event) {
+    var btn = event.target.closest(".chip");
+    if (!btn) return;
+    state.mode = btn.getAttribute("data-m");
+    Array.prototype.forEach.call(el.modes.querySelectorAll(".chip"), function (c) {
+      c.setAttribute("aria-pressed", c === btn ? "true" : "false");
+    });
+    renderScript();
+  });
+
+  el.btnSkip.addEventListener("click", advanceScript);
+
+  el.btnMisheard.addEventListener("click", function () {
+    recordScript(SCRIPT_LINES[state.scriptIndex], state.pendingHeard, "wrong");
+    advanceScript();
+  });
+
+  // 사용자가 문장을 잘못 읽은 경우는 인식기 성능이 아니므로 집계에서 뺀다.
+  el.btnMisread.addEventListener("click", advanceScript);
+
   // Backgrounding the page tears down the audio session; stop cleanly
   // rather than leaving the UI stuck on "듣는 중".
   document.addEventListener("visibilitychange", function () {
@@ -871,18 +1255,33 @@
       el.exportBox.classList.add("show");
       return;
     }
-    var rated = state.entries.filter(function (e) { return e.verdict; });
-    var ok = state.entries.filter(function (e) { return e.verdict === "correct"; });
     var lines = [];
-    lines.push("LiftVoice STT 테스트 결과");
-    lines.push("총 " + state.entries.length + "발화 / 평가 " + rated.length + " / 정확 " + ok.length +
-      (rated.length ? " / 인식률 " + Math.round((ok.length / rated.length) * 100) + "%" : ""));
+    lines.push("LiftVoice STT 측정 결과");
+    lines.push("생성: " + new Date().toISOString());
     lines.push("");
+
+    var byCond = {};
+    state.entries.forEach(function (e) {
+      if (!byCond[e.condition]) byCond[e.condition] = [];
+      byCond[e.condition].push(e);
+    });
+
+    lines.push("=== 조건별 요약 ===");
+    Object.keys(byCond).forEach(function (cond) {
+      var group = byCond[cond];
+      var judged = group.filter(function (e) { return e.verdict; });
+      var right = group.filter(function (e) { return e.verdict === "correct"; });
+      var pct = judged.length ? Math.round((right.length / judged.length) * 100) + "%" : "—";
+      lines.push(cond + ": " + right.length + "/" + judged.length + " (" + pct + ")");
+    });
+    lines.push("");
+
+    lines.push("=== 전체 발화 ===");
     state.entries.forEach(function (e, i) {
       var mark = e.verdict === "correct" ? "O" : (e.verdict === "wrong" ? "X" : "-");
       lines.push((i + 1) + ". [" + mark + "] " + e.time + " (" + e.condition + ")");
+      if (e.expected) lines.push("   기대: " + e.expected);
       lines.push("   인식: " + e.text);
-      if (e.verdict === "wrong" && e.truth) lines.push("   실제: " + e.truth);
     });
     var text = lines.join("\n");
     el.exportBox.textContent = text;
@@ -921,6 +1320,7 @@
   load();
   renderLog();
   renderStats();
+  renderScript();
 
   // Android WebView exposes SpeechRecognition but never fires its events,
   // so this must be checked before the constructor test below.
