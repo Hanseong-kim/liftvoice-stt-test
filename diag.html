@@ -1,0 +1,529 @@
+<title>LiftVoice 음성 진단</title>
+
+<style>
+  :root {
+    --bg: #EFF1F0;
+    --surface: #FFFFFF;
+    --surface-2: #E7EAE9;
+    --ink: #16191C;
+    --muted: #5E6871;
+    --line: #D6DAD8;
+    --accent: #1D4E89;
+    --accent-ink: #FFFFFF;
+    --hot: #C8102E;
+    --good: #1F6F43;
+    --warn: #8A5A00;
+
+    --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+    --font-mono: ui-monospace, "SF Mono", "Roboto Mono", "Consolas", monospace;
+    --r: 10px;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #101315; --surface: #191D20; --surface-2: #23282C;
+      --ink: #E9EDEA; --muted: #8B959B; --line: #2A2F33;
+      --accent: #7EB0E8; --accent-ink: #0D1418;
+      --hot: #FF4D5E; --good: #5FD08D; --warn: #E8B33D;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #101315; --surface: #191D20; --surface-2: #23282C;
+    --ink: #E9EDEA; --muted: #8B959B; --line: #2A2F33;
+    --accent: #7EB0E8; --accent-ink: #0D1418;
+    --hot: #FF4D5E; --good: #5FD08D; --warn: #E8B33D;
+  }
+  :root[data-theme="light"] {
+    --bg: #EFF1F0; --surface: #FFFFFF; --surface-2: #E7EAE9;
+    --ink: #16191C; --muted: #5E6871; --line: #D6DAD8;
+    --accent: #1D4E89; --accent-ink: #FFFFFF;
+    --hot: #C8102E; --good: #1F6F43; --warn: #8A5A00;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-ui);
+    line-height: 1.5;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  .wrap {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  h1 {
+    font-size: 20px;
+    font-weight: 650;
+    letter-spacing: -0.01em;
+    margin-top: 4px;
+  }
+  h2 {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--r);
+    padding: 14px;
+  }
+
+  .checks {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+    border-radius: var(--r);
+    overflow: hidden;
+  }
+  .check {
+    background: var(--surface);
+    padding: 11px 13px;
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+  }
+  .check .name { flex: 1; font-size: 14px; }
+  .check .val {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 600;
+    text-align: right;
+    word-break: break-word;
+    max-width: 55%;
+  }
+  .check[data-s="ok"] .val { color: var(--good); }
+  .check[data-s="bad"] .val { color: var(--hot); }
+  .check[data-s="warn"] .val { color: var(--warn); }
+  .check[data-s="info"] .val { color: var(--muted); }
+
+  .btn {
+    font: inherit;
+    font-size: 16px;
+    font-weight: 600;
+    width: 100%;
+    min-height: 54px;
+    border-radius: var(--r);
+    border: 1px solid var(--accent);
+    background: var(--accent);
+    color: var(--accent-ink);
+    cursor: pointer;
+  }
+  .btn.sec {
+    background: var(--surface);
+    color: var(--ink);
+    border-color: var(--line);
+    font-weight: 500;
+    min-height: 46px;
+    font-size: 14px;
+  }
+  .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+  .stack { display: flex; flex-direction: column; gap: 10px; }
+
+  .verdict {
+    border-radius: var(--r);
+    padding: 13px 15px;
+    font-size: 15px;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    display: none;
+  }
+  .verdict.show { display: block; }
+  .verdict.ok { border-color: var(--good); color: var(--good); }
+  .verdict.bad { border-color: var(--hot); color: var(--hot); }
+  .verdict strong { font-weight: 700; }
+
+  .logbox {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    line-height: 1.6;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--r);
+    padding: 12px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 300px;
+    overflow-y: auto;
+    color: var(--ink);
+  }
+  .logbox .t { color: var(--muted); }
+
+  .note { font-size: 13px; color: var(--muted); line-height: 1.6; }
+
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+</style>
+
+<div class="wrap">
+
+  <div>
+    <div class="eyebrow">LiftVoice · 진단</div>
+    <h1>음성인식이 어디서 막히는지 확인</h1>
+  </div>
+
+  <div class="verdict" id="v-top"></div>
+
+  <p class="note">
+    아래 검사를 위에서부터 순서대로 실행하세요. 각 단계가 어디서 실패하는지가 원인을 알려줍니다.
+    끝나면 <strong>전체 복사</strong>를 눌러 결과를 붙여넣어 주세요.
+  </p>
+
+  <div>
+    <h2>1 · 환경 검사 (자동)</h2>
+    <div class="checks" id="checks"></div>
+  </div>
+
+  <div>
+    <h2>2 · 마이크 접근 검사</h2>
+    <div class="stack">
+      <button class="btn" type="button" id="btn-mic">마이크 권한 요청</button>
+      <div class="verdict" id="v-mic"></div>
+    </div>
+  </div>
+
+  <div>
+    <h2>3 · 음성인식 엔진 검사</h2>
+    <div class="stack">
+      <button class="btn" type="button" id="btn-sr">음성인식 5초 시도</button>
+      <div class="verdict" id="v-sr"></div>
+    </div>
+  </div>
+
+  <div>
+    <h2>4 · 이벤트 로그</h2>
+    <div class="stack">
+      <div class="logbox" id="log">대기 중…</div>
+      <button class="btn sec" type="button" id="btn-copy">전체 복사</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+  var el = {
+    checks: document.getElementById("checks"),
+    btnMic: document.getElementById("btn-mic"),
+    vMic: document.getElementById("v-mic"),
+    btnSr: document.getElementById("btn-sr"),
+    vSr: document.getElementById("v-sr"),
+    log: document.getElementById("log"),
+    btnCopy: document.getElementById("btn-copy")
+  };
+
+  var lines = [];
+  var t0 = Date.now();
+
+  function log(msg) {
+    var dt = ((Date.now() - t0) / 1000).toFixed(2);
+    lines.push("[" + dt + "s] " + msg);
+    el.log.textContent = lines.join("\n");
+    el.log.scrollTop = el.log.scrollHeight;
+  }
+
+  function addCheck(name, value, status) {
+    var row = document.createElement("div");
+    row.className = "check";
+    row.setAttribute("data-s", status || "info");
+    var n = document.createElement("div");
+    n.className = "name";
+    n.textContent = name;
+    var v = document.createElement("div");
+    v.className = "val";
+    v.textContent = value;
+    row.appendChild(n);
+    row.appendChild(v);
+    el.checks.appendChild(row);
+    lines.push("CHECK  " + name + " = " + value);
+  }
+
+  function verdict(node, html, kind) {
+    node.innerHTML = html;
+    node.className = "verdict show " + kind;
+  }
+
+  /* ---------- 1. environment ---------- */
+
+  var framed = window.self !== window.top;
+
+  addCheck("보안 연결 (HTTPS)", window.isSecureContext ? "예" : "아니오",
+    window.isSecureContext ? "ok" : "bad");
+
+  addCheck("iframe 안에서 실행", framed ? "예" : "아니오",
+    framed ? "warn" : "ok");
+
+  addCheck("SpeechRecognition API", SR ? "있음" : "없음", SR ? "ok" : "bad");
+
+  addCheck("mediaDevices API",
+    (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) ? "있음" : "없음",
+    (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) ? "ok" : "bad");
+
+  // Permissions-Policy is the direct answer to "does this iframe allow the mic".
+  var pp = document.permissionsPolicy || document.featurePolicy;
+  if (pp && typeof pp.allowsFeature === "function") {
+    var allowed;
+    try {
+      allowed = pp.allowsFeature("microphone");
+    } catch (e) {
+      allowed = null;
+    }
+    if (allowed === null) {
+      addCheck("마이크 권한 정책", "확인 불가", "info");
+    } else {
+      addCheck("마이크 권한 정책", allowed ? "허용됨" : "차단됨", allowed ? "ok" : "bad");
+    }
+  } else {
+    addCheck("마이크 권한 정책", "조회 API 없음", "info");
+  }
+
+  addCheck("온라인 상태", navigator.onLine ? "온라인" : "오프라인",
+    navigator.onLine ? "ok" : "bad");
+
+  var ua = navigator.userAgent;
+  // Android WebView marks itself with "; wv" in the UA. In a WebView the
+  // SpeechRecognition constructor exists but no events ever fire, which
+  // looks identical to a hang.
+  var isWebView = /;\s*wv[;)]/.test(ua) || /\bwv\b/.test(ua);
+  var isSamsung = /SamsungBrowser/.test(ua);
+  var isChrome = /Chrome\/\d+/.test(ua) && !/Edg\//.test(ua) && !isSamsung && !isWebView;
+
+  addCheck("앱 내장 브라우저 (WebView)", isWebView ? "예 — 음성인식 불가" : "아니오",
+    isWebView ? "bad" : "ok");
+  addCheck("브라우저",
+    isWebView ? "WebView" : (isSamsung ? "삼성 인터넷" : (isChrome ? "Chrome" : "기타")),
+    isChrome ? "ok" : "bad");
+
+  if (isWebView) {
+    verdict(document.getElementById("v-top"),
+      "<strong>앱 내장 브라우저에서 실행 중입니다.</strong><br>" +
+      "Claude 앱 같은 앱 안의 화면에서는 음성인식이 동작하지 않습니다. 객체는 존재하지만 이벤트가 발생하지 않아 " +
+      "'연결 중'에서 멈춘 것처럼 보입니다.<br><br>" +
+      "우측 상단 메뉴에서 <strong>브라우저에서 열기</strong>를 눌러 <strong>Chrome</strong>으로 여세요. " +
+      "또는 주소를 복사해 Chrome 주소창에 직접 붙여넣으세요.",
+      "bad");
+  } else if (isSamsung) {
+    verdict(document.getElementById("v-top"),
+      "<strong>삼성 인터넷은 음성인식을 지원하지 않습니다.</strong> Chrome으로 여세요.", "bad");
+  }
+
+  lines.push("UA     " + ua);
+  el.log.textContent = lines.join("\n");
+
+  if (!navigator.permissions || !navigator.permissions.query) {
+    addCheck("마이크 권한 상태", "조회 API 없음", "info");
+  } else {
+    navigator.permissions.query({ name: "microphone" }).then(function (res) {
+      addCheck("마이크 권한 상태", res.state,
+        res.state === "granted" ? "ok" : (res.state === "denied" ? "bad" : "warn"));
+    }, function (err) {
+      addCheck("마이크 권한 상태", "조회 실패: " + err.name, "info");
+    });
+  }
+
+  /* ---------- 2. microphone probe ---------- */
+
+  el.btnMic.addEventListener("click", function () {
+    el.btnMic.disabled = true;
+    el.btnMic.textContent = "요청 중…";
+    log("MIC    getUserMedia 호출");
+
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      log("MIC    실패: mediaDevices API 없음");
+      verdict(el.vMic, "<strong>실패</strong> — 이 브라우저에 마이크 API가 없습니다.", "bad");
+      el.btnMic.textContent = "마이크 권한 요청";
+      el.btnMic.disabled = false;
+      return;
+    }
+
+    navigator.mediaDevices.getUserMedia({ audio: true }).then(function (stream) {
+      var track = stream.getAudioTracks()[0];
+      var label = track ? (track.label || "(이름 없음)") : "(트랙 없음)";
+      log("MIC    성공. track=" + label);
+      verdict(el.vMic,
+        "<strong>마이크 정상</strong> — 접근에 성공했습니다. 문제는 마이크가 아니라 음성인식 엔진 쪽입니다. 3번을 실행하세요.",
+        "ok");
+      stream.getTracks().forEach(function (t) { t.stop(); });
+      el.btnMic.textContent = "다시 검사";
+      el.btnMic.disabled = false;
+    }, function (err) {
+      log("MIC    실패: " + err.name + " — " + (err.message || ""));
+      var msg;
+      if (err.name === "NotAllowedError") {
+        msg = framed
+          ? "<strong>마이크 차단됨</strong> — iframe 안이라 권한이 거부되었을 가능성이 큽니다. 이 경우 페이지를 다른 곳에 호스팅해야 합니다."
+          : "<strong>마이크 권한 거부</strong> — 주소창 자물쇠 아이콘에서 마이크를 허용하세요.";
+      } else if (err.name === "NotFoundError") {
+        msg = "<strong>마이크를 찾을 수 없습니다.</strong>";
+      } else if (err.name === "NotReadableError") {
+        msg = "<strong>마이크가 사용 중입니다.</strong> 다른 앱을 닫고 다시 시도하세요.";
+      } else if (err.name === "SecurityError") {
+        msg = "<strong>보안 정책으로 차단</strong> — iframe 권한 정책 문제입니다.";
+      } else {
+        msg = "<strong>실패: " + err.name + "</strong>";
+      }
+      verdict(el.vMic, msg + "<br><br><code>" + err.name + ": " + (err.message || "") + "</code>", "bad");
+      el.btnMic.textContent = "다시 검사";
+      el.btnMic.disabled = false;
+    });
+  });
+
+  /* ---------- 3. speech recognition probe ---------- */
+
+  el.btnSr.addEventListener("click", function () {
+    if (!SR) {
+      verdict(el.vSr, "<strong>SpeechRecognition API가 없습니다.</strong> Chrome으로 열어 주세요.", "bad");
+      return;
+    }
+
+    el.btnSr.disabled = true;
+    el.btnSr.textContent = "시도 중… 아무 말이나 해보세요";
+    el.vSr.className = "verdict";
+
+    var sawStart = false;
+    var sawAudio = false;
+    var sawResult = false;
+    var sawError = null;
+    var finished = false;
+
+    var r = new SR();
+    r.lang = "ko-KR";
+    r.continuous = false;
+    r.interimResults = true;
+
+    ["audiostart", "soundstart", "speechstart", "speechend", "soundend", "audioend"]
+      .forEach(function (name) {
+        r["on" + name] = function () {
+          if (name === "audiostart") sawAudio = true;
+          log("SR     " + name);
+        };
+      });
+
+    r.onstart = function () {
+      sawStart = true;
+      log("SR     onstart  ← 엔진이 실제로 시작됨");
+    };
+
+    r.onresult = function (event) {
+      sawResult = true;
+      var txt = "";
+      for (var i = 0; i < event.results.length; i++) txt += event.results[i][0].transcript;
+      log("SR     onresult \"" + txt + "\"");
+    };
+
+    r.onerror = function (event) {
+      sawError = event.error;
+      log("SR     onerror  " + event.error + (event.message ? " — " + event.message : ""));
+    };
+
+    r.onend = function () {
+      log("SR     onend");
+      finish();
+    };
+
+    function finish() {
+      if (finished) return;
+      finished = true;
+      el.btnSr.disabled = false;
+      el.btnSr.textContent = "다시 시도";
+
+      if (sawResult) {
+        verdict(el.vSr, "<strong>음성인식 정상 작동</strong> — 엔진이 텍스트를 반환했습니다.", "ok");
+      } else if (sawError === "not-allowed" || sawError === "service-not-allowed") {
+        verdict(el.vSr,
+          "<strong>권한 거부 (" + sawError + ")</strong> — " +
+          (framed ? "iframe 권한 정책 문제일 가능성이 큽니다. 다른 호스팅이 필요합니다."
+                  : "브라우저 사이트 설정에서 마이크를 허용하세요."), "bad");
+      } else if (sawError === "network") {
+        verdict(el.vSr, "<strong>네트워크 오류</strong> — 구글 음성인식 서버에 닿지 못했습니다.", "bad");
+      } else if (sawError === "no-speech") {
+        verdict(el.vSr, "<strong>엔진은 작동하지만 소리를 못 들었습니다.</strong> 마이크 입력이 엔진에 전달되지 않는 상태일 수 있습니다.", "warn");
+      } else if (sawError === "language-not-supported") {
+        verdict(el.vSr, "<strong>ko-KR 미지원</strong> — 이 기기에서 한국어 인식을 쓸 수 없습니다.", "bad");
+      } else if (!sawStart) {
+        verdict(el.vSr,
+          "<strong>엔진이 시작조차 못 했습니다.</strong> onstart도 onerror도 발생하지 않았습니다. " +
+          (framed ? "iframe 권한 정책에 막혔을 가능성이 가장 큽니다." : "음성 서비스가 비활성화되었을 수 있습니다."),
+          "bad");
+      } else if (!sawAudio) {
+        verdict(el.vSr, "<strong>시작은 됐지만 오디오가 열리지 않았습니다.</strong> 마이크가 엔진에 연결되지 않았습니다.", "bad");
+      } else if (sawError) {
+        verdict(el.vSr, "<strong>오류: " + sawError + "</strong>", "bad");
+      } else {
+        verdict(el.vSr, "<strong>소리는 들어왔지만 인식 결과가 없습니다.</strong> 더 크게 또렷하게 다시 시도해 보세요.", "warn");
+      }
+    }
+
+    log("SR     start() 호출");
+    try {
+      r.start();
+    } catch (e) {
+      // Surface the synchronous throw instead of swallowing it.
+      log("SR     start() 예외: " + e.name + " — " + (e.message || ""));
+      verdict(el.vSr, "<strong>start() 예외 발생</strong><br><code>" + e.name + ": " + (e.message || "") + "</code>", "bad");
+      el.btnSr.disabled = false;
+      el.btnSr.textContent = "다시 시도";
+      finished = true;
+      return;
+    }
+
+    // Watchdog: onstart is not guaranteed to fire. Report the silence.
+    setTimeout(function () {
+      if (!sawStart && !finished) {
+        log("SR     5초 경과 — onstart/onerror 둘 다 발생하지 않음");
+        try { r.abort(); } catch (e) { /* nothing to abort */ }
+        finish();
+      }
+    }, 5000);
+
+    setTimeout(function () {
+      if (!finished) {
+        log("SR     10초 경과 — 종료");
+        try { r.stop(); } catch (e) { /* already stopping */ }
+        setTimeout(finish, 800);
+      }
+    }, 10000);
+  });
+
+  /* ---------- 4. copy ---------- */
+
+  el.btnCopy.addEventListener("click", function () {
+    var text = lines.join("\n");
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () {
+        el.btnCopy.textContent = "복사됨";
+        setTimeout(function () { el.btnCopy.textContent = "전체 복사"; }, 1600);
+      }, function () {
+        el.btnCopy.textContent = "복사 실패 — 위 로그를 길게 눌러 선택하세요";
+      });
+    } else {
+      el.btnCopy.textContent = "복사 불가 — 위 로그를 길게 눌러 선택하세요";
+    }
+  });
+
+  log("진단 페이지 로드 완료");
+})();
+</script>

@@ -1,0 +1,946 @@
+<title>LiftVoice STT 현장 테스트</title>
+
+<style>
+  :root {
+    --bg: #EFF1F0;
+    --surface: #FFFFFF;
+    --surface-2: #E7EAE9;
+    --ink: #16191C;
+    --muted: #5E6871;
+    --line: #D6DAD8;
+    --accent: #1D4E89;
+    --accent-ink: #FFFFFF;
+    --hot: #C8102E;
+    --good: #1F6F43;
+    --warn: #8A5A00;
+
+    --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+    --font-mono: ui-monospace, "SF Mono", "Roboto Mono", "Consolas", monospace;
+
+    --r: 10px;
+    --pad: 16px;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #101315;
+      --surface: #191D20;
+      --surface-2: #23282C;
+      --ink: #E9EDEA;
+      --muted: #8B959B;
+      --line: #2A2F33;
+      --accent: #7EB0E8;
+      --accent-ink: #0D1418;
+      --hot: #FF4D5E;
+      --good: #5FD08D;
+      --warn: #E8B33D;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --bg: #101315;
+    --surface: #191D20;
+    --surface-2: #23282C;
+    --ink: #E9EDEA;
+    --muted: #8B959B;
+    --line: #2A2F33;
+    --accent: #7EB0E8;
+    --accent-ink: #0D1418;
+    --hot: #FF4D5E;
+    --good: #5FD08D;
+    --warn: #E8B33D;
+  }
+
+  :root[data-theme="light"] {
+    --bg: #EFF1F0;
+    --surface: #FFFFFF;
+    --surface-2: #E7EAE9;
+    --ink: #16191C;
+    --muted: #5E6871;
+    --line: #D6DAD8;
+    --accent: #1D4E89;
+    --accent-ink: #FFFFFF;
+    --hot: #C8102E;
+    --good: #1F6F43;
+    --warn: #8A5A00;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-ui);
+    line-height: 1.5;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  .wrap {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: var(--pad);
+    padding-bottom: 132px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  /* ---- header ---- */
+  .head {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  h1 {
+    font-size: 20px;
+    font-weight: 650;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+  }
+
+  /* ---- support banner ---- */
+  .banner {
+    border-radius: var(--r);
+    padding: 12px 14px;
+    font-size: 14px;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    display: none;
+  }
+  .banner.show { display: block; }
+  .banner.bad {
+    border-color: var(--hot);
+    color: var(--hot);
+  }
+  .banner strong { font-weight: 650; }
+
+  /* ---- condition chips ---- */
+  .field-label {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .chip {
+    font: inherit;
+    font-size: 14px;
+    padding: 9px 14px;
+    min-height: 42px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .chip[aria-pressed="true"] {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-ink);
+    font-weight: 600;
+  }
+
+  /* ---- stats ---- */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+    border-radius: var(--r);
+    overflow: hidden;
+  }
+  .stat {
+    background: var(--surface);
+    padding: 12px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .stat .k {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .stat .v {
+    font-family: var(--font-mono);
+    font-size: 22px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+  }
+
+  /* ---- live panel ---- */
+  .live {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--r);
+    padding: 16px;
+    min-height: 150px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .live.hot { border-color: var(--hot); }
+
+  .status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--muted);
+    flex: none;
+  }
+  .live.hot .dot {
+    background: var(--hot);
+    animation: pulse 1.2s ease-in-out infinite;
+  }
+  .live.hot .status { color: var(--hot); }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.25; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .live.hot .dot { animation: none; }
+  }
+
+  .transcript {
+    font-size: clamp(1.25rem, 5.5vw, 1.75rem);
+    line-height: 1.35;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+    word-break: keep-all;
+    overflow-wrap: anywhere;
+  }
+  .transcript .interim {
+    color: var(--muted);
+    font-style: italic;
+  }
+  .transcript .placeholder {
+    color: var(--muted);
+    font-size: 1rem;
+    font-style: normal;
+  }
+
+  /* ---- log ---- */
+  .log {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .entry {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--line);
+    border-radius: var(--r);
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .entry[data-verdict="correct"] { border-left-color: var(--good); }
+  .entry[data-verdict="wrong"] { border-left-color: var(--hot); }
+
+  .entry-meta {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .entry-text {
+    font-size: 17px;
+    word-break: keep-all;
+    overflow-wrap: anywhere;
+  }
+  .entry-truth {
+    font-size: 14px;
+    color: var(--hot);
+    word-break: keep-all;
+    overflow-wrap: anywhere;
+  }
+  .entry-truth .lbl {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-right: 6px;
+  }
+
+  .verdict {
+    display: flex;
+    gap: 8px;
+  }
+  .vbtn {
+    font: inherit;
+    font-size: 14px;
+    flex: 1;
+    min-height: 44px;
+    border-radius: 8px;
+    border: 1px solid var(--line);
+    background: var(--surface-2);
+    color: var(--ink);
+    cursor: pointer;
+  }
+  .vbtn.ok[aria-pressed="true"] {
+    background: var(--good);
+    border-color: var(--good);
+    color: var(--surface);
+    font-weight: 600;
+  }
+  .vbtn.no[aria-pressed="true"] {
+    background: var(--hot);
+    border-color: var(--hot);
+    color: var(--surface);
+    font-weight: 600;
+  }
+
+  .truth-input {
+    font: inherit;
+    font-size: 16px;
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--line);
+    background: var(--bg);
+    color: var(--ink);
+    display: none;
+  }
+  .truth-input.show { display: block; }
+
+  /* ---- bottom bar ---- */
+  .bar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--bg);
+    border-top: 1px solid var(--line);
+    padding: 12px var(--pad);
+    padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  }
+  .bar-inner {
+    max-width: 640px;
+    margin: 0 auto;
+    display: flex;
+    gap: 10px;
+    align-items: stretch;
+  }
+  .rec {
+    font: inherit;
+    flex: 1;
+    min-height: 62px;
+    font-size: 18px;
+    font-weight: 650;
+    border-radius: var(--r);
+    border: 1px solid var(--accent);
+    background: var(--accent);
+    color: var(--accent-ink);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+  }
+  .rec[data-on="true"] {
+    background: var(--hot);
+    border-color: var(--hot);
+    color: #FFFFFF;
+  }
+  .rec:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  /* ---- utility buttons ---- */
+  .tools {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .tbtn {
+    font: inherit;
+    font-size: 14px;
+    padding: 10px 14px;
+    min-height: 44px;
+    border-radius: 8px;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--ink);
+    cursor: pointer;
+  }
+  .tbtn.danger { color: var(--hot); }
+
+  .export {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    line-height: 1.5;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--r);
+    padding: 12px;
+    white-space: pre;
+    overflow-x: auto;
+    display: none;
+    color: var(--ink);
+  }
+  .export.show { display: block; }
+
+  .empty {
+    color: var(--muted);
+    font-size: 14px;
+    text-align: center;
+    padding: 20px 0;
+  }
+
+  .note {
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+</style>
+
+<div class="wrap">
+
+  <div class="head">
+    <div class="eyebrow">LiftVoice · 검증 1</div>
+    <h1>헬스장 소음 한국어 인식 테스트</h1>
+  </div>
+
+  <div class="banner" id="banner"></div>
+
+  <div>
+    <div class="field-label">측정 환경</div>
+    <div class="chips" id="conds">
+      <button class="chip" type="button" data-c="조용" aria-pressed="true">조용</button>
+      <button class="chip" type="button" data-c="헬스장" aria-pressed="false">헬스장</button>
+      <button class="chip" type="button" data-c="기구소음 근처" aria-pressed="false">기구소음 근처</button>
+    </div>
+  </div>
+
+  <div class="stats">
+    <div class="stat">
+      <div class="k">발화</div>
+      <div class="v" id="s-total">0</div>
+    </div>
+    <div class="stat">
+      <div class="k">정확</div>
+      <div class="v" id="s-ok">0</div>
+    </div>
+    <div class="stat">
+      <div class="k">인식률</div>
+      <div class="v" id="s-rate">—</div>
+    </div>
+  </div>
+
+  <div class="live" id="live">
+    <div class="status">
+      <span class="dot"></span>
+      <span id="status-text">대기 중</span>
+    </div>
+    <div class="transcript" id="transcript">
+      <span class="placeholder">아래 버튼을 누르고 말해보세요. 예: "스쿼트 100 5개"</span>
+    </div>
+  </div>
+
+  <div class="log" id="log"></div>
+  <div class="empty" id="empty">아직 기록된 발화가 없습니다.</div>
+
+  <div class="tools">
+    <button class="tbtn" type="button" id="btn-export">결과 보기 / 복사</button>
+    <button class="tbtn danger" type="button" id="btn-clear">전체 삭제</button>
+  </div>
+
+  <pre class="export" id="export"></pre>
+
+  <p class="note">
+    구글 음성인식(Web Speech API, ko-KR)을 씁니다. 인식된 문장마다 정확/틀림을 눌러 주세요.
+    틀렸으면 실제로 말한 내용을 적으면 인식률에 반영됩니다. 기록은 이 브라우저에 저장되며 페이지를 새로고침해도 남습니다.
+  </p>
+
+</div>
+
+<div class="bar">
+  <div class="bar-inner">
+    <button class="rec" type="button" id="rec" data-on="false">
+      <span id="rec-label">녹음 시작</span>
+    </button>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  var STORE = "liftvoice.stt.v1";
+
+  var el = {
+    banner: document.getElementById("banner"),
+    conds: document.getElementById("conds"),
+    live: document.getElementById("live"),
+    statusText: document.getElementById("status-text"),
+    transcript: document.getElementById("transcript"),
+    log: document.getElementById("log"),
+    empty: document.getElementById("empty"),
+    rec: document.getElementById("rec"),
+    recLabel: document.getElementById("rec-label"),
+    sTotal: document.getElementById("s-total"),
+    sOk: document.getElementById("s-ok"),
+    sRate: document.getElementById("s-rate"),
+    exportBox: document.getElementById("export"),
+    btnExport: document.getElementById("btn-export"),
+    btnClear: document.getElementById("btn-clear")
+  };
+
+  var state = {
+    listening: false,     // user intent: should we be capturing
+    running: false,       // engine actually running
+    condition: "조용",
+    entries: []
+  };
+
+  var rec = null;
+  var startWatchdog = null;
+
+  /* ---------- persistence ---------- */
+
+  function load() {
+    try {
+      var raw = localStorage.getItem(STORE);
+      if (raw) {
+        var parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) state.entries = parsed;
+      }
+    } catch (e) { /* corrupt or unavailable storage: start empty */ }
+  }
+
+  function save() {
+    try {
+      localStorage.setItem(STORE, JSON.stringify(state.entries));
+    } catch (e) { /* quota or private mode: keep working in memory */ }
+  }
+
+  /* ---------- rendering ---------- */
+
+  function setStatus(text, hot) {
+    el.statusText.textContent = text;
+    el.live.classList.toggle("hot", !!hot);
+  }
+
+  function showBanner(html, bad) {
+    el.banner.innerHTML = html;
+    el.banner.classList.add("show");
+    el.banner.classList.toggle("bad", !!bad);
+  }
+
+  function renderTranscript(finalText, interimText) {
+    if (!finalText && !interimText) {
+      el.transcript.innerHTML = '<span class="placeholder">아래 버튼을 누르고 말해보세요. 예: "스쿼트 100 5개"</span>';
+      return;
+    }
+    el.transcript.textContent = "";
+    if (finalText) {
+      el.transcript.appendChild(document.createTextNode(finalText + " "));
+    }
+    if (interimText) {
+      var s = document.createElement("span");
+      s.className = "interim";
+      s.textContent = interimText;
+      el.transcript.appendChild(s);
+    }
+  }
+
+  function renderStats() {
+    var rated = state.entries.filter(function (e) { return e.verdict; });
+    var ok = state.entries.filter(function (e) { return e.verdict === "correct"; });
+    el.sTotal.textContent = String(state.entries.length);
+    el.sOk.textContent = String(ok.length);
+    el.sRate.textContent = rated.length
+      ? Math.round((ok.length / rated.length) * 100) + "%"
+      : "—";
+  }
+
+  function renderLog() {
+    el.log.textContent = "";
+    el.empty.style.display = state.entries.length ? "none" : "block";
+
+    state.entries.slice().reverse().forEach(function (entry) {
+      var node = document.createElement("div");
+      node.className = "entry";
+      if (entry.verdict) node.setAttribute("data-verdict", entry.verdict);
+
+      var meta = document.createElement("div");
+      meta.className = "entry-meta";
+      meta.textContent = entry.time + " · " + entry.condition;
+      node.appendChild(meta);
+
+      var text = document.createElement("div");
+      text.className = "entry-text";
+      text.textContent = entry.text;
+      node.appendChild(text);
+
+      if (entry.verdict === "wrong" && entry.truth) {
+        var truth = document.createElement("div");
+        truth.className = "entry-truth";
+        var lbl = document.createElement("span");
+        lbl.className = "lbl";
+        lbl.textContent = "실제";
+        truth.appendChild(lbl);
+        truth.appendChild(document.createTextNode(entry.truth));
+        node.appendChild(truth);
+      }
+
+      var verdict = document.createElement("div");
+      verdict.className = "verdict";
+
+      var okBtn = document.createElement("button");
+      okBtn.type = "button";
+      okBtn.className = "vbtn ok";
+      okBtn.textContent = "정확";
+      okBtn.setAttribute("aria-pressed", entry.verdict === "correct" ? "true" : "false");
+
+      var noBtn = document.createElement("button");
+      noBtn.type = "button";
+      noBtn.className = "vbtn no";
+      noBtn.textContent = "틀림";
+      noBtn.setAttribute("aria-pressed", entry.verdict === "wrong" ? "true" : "false");
+
+      var input = document.createElement("input");
+      input.className = "truth-input";
+      input.type = "text";
+      input.placeholder = "실제로 말한 내용";
+      input.value = entry.truth || "";
+      if (entry.verdict === "wrong") input.classList.add("show");
+
+      okBtn.addEventListener("click", function () {
+        entry.verdict = entry.verdict === "correct" ? null : "correct";
+        entry.truth = "";
+        save();
+        renderLog();
+        renderStats();
+      });
+
+      noBtn.addEventListener("click", function () {
+        entry.verdict = entry.verdict === "wrong" ? null : "wrong";
+        save();
+        renderLog();
+        renderStats();
+      });
+
+      input.addEventListener("input", function () {
+        entry.truth = input.value;
+        save();
+      });
+
+      verdict.appendChild(okBtn);
+      verdict.appendChild(noBtn);
+      node.appendChild(verdict);
+      node.appendChild(input);
+
+      el.log.appendChild(node);
+    });
+  }
+
+  function addEntry(text) {
+    var trimmed = (text || "").trim();
+    if (!trimmed) return;
+    var now = new Date();
+    state.entries.push({
+      id: String(now.getTime()) + Math.random().toString(36).slice(2, 6),
+      time: now.toTimeString().slice(0, 8),
+      date: now.toISOString(),
+      condition: state.condition,
+      text: trimmed,
+      verdict: null,
+      truth: ""
+    });
+    save();
+    renderLog();
+    renderStats();
+  }
+
+  /* ---------- engine ---------- */
+
+  function buildRecognizer() {
+    var r = new SR();
+    r.lang = "ko-KR";
+    r.continuous = true;
+    r.interimResults = true;
+    r.maxAlternatives = 1;
+
+    r.onstart = function () {
+      state.running = true;
+      clearTimeout(startWatchdog);
+      setStatus("듣는 중", true);
+    };
+
+    r.onresult = function (event) {
+      var finalText = "";
+      var interimText = "";
+      for (var i = event.resultIndex; i < event.results.length; i++) {
+        var res = event.results[i];
+        if (res.isFinal) {
+          finalText += res[0].transcript;
+        } else {
+          interimText += res[0].transcript;
+        }
+      }
+      if (finalText) {
+        addEntry(finalText);
+        renderTranscript(finalText.trim(), "");
+      } else {
+        renderTranscript("", interimText);
+      }
+    };
+
+    r.onerror = function (event) {
+      var code = event.error;
+      if (code === "no-speech" || code === "aborted") {
+        // Benign: onend will restart if the user is still listening.
+        return;
+      }
+      if (code === "not-allowed" || code === "service-not-allowed") {
+        stop();
+        showBanner(
+          "<strong>마이크 권한이 거부되었습니다.</strong> 주소창의 자물쇠 아이콘에서 마이크를 허용한 뒤 다시 시도하세요.",
+          true
+        );
+        return;
+      }
+      if (code === "audio-capture") {
+        stop();
+        showBanner("<strong>마이크를 찾을 수 없습니다.</strong> 다른 앱이 마이크를 쓰고 있는지 확인하세요.", true);
+        return;
+      }
+      if (code === "network") {
+        stop();
+        showBanner("<strong>네트워크 오류입니다.</strong> 구글 음성인식은 인터넷 연결이 필요합니다. 연결을 확인하고 다시 시도하세요.", true);
+        return;
+      }
+      stop();
+      showBanner("<strong>인식 오류: " + code + "</strong> 다시 시도해 주세요.", true);
+    };
+
+    // Chrome ends the session on its own after silence, even with
+    // continuous = true. Restart whenever the user still intends to listen.
+    r.onend = function () {
+      state.running = false;
+      if (state.listening) {
+        try {
+          r.start();
+        } catch (e) {
+          // start() throws if the engine has not fully released yet; retry shortly.
+          setTimeout(function () {
+            if (state.listening && !state.running) {
+              try { r.start(); } catch (e2) { stop(); }
+            }
+          }, 300);
+        }
+      } else {
+        setStatus("대기 중", false);
+      }
+    };
+
+    return r;
+  }
+
+  function start() {
+    if (state.listening) return;
+    state.listening = true;
+    el.rec.setAttribute("data-on", "true");
+    el.recLabel.textContent = "정지";
+    setStatus("연결 중", true);
+    el.banner.classList.remove("show");
+
+    try {
+      rec.start();
+    } catch (e) {
+      // InvalidStateError means the previous session has not released yet;
+      // anything else is a real failure the user needs to see.
+      if (e && e.name === "InvalidStateError") {
+        return;
+      }
+      stop();
+      showBanner("<strong>음성인식을 시작할 수 없습니다: " + (e && e.name) + "</strong> " +
+        (e && e.message ? e.message : ""), true);
+      return;
+    }
+
+    // onstart is not guaranteed to fire — in an in-app WebView the engine
+    // accepts start() and then goes silent. Never leave the UI on "연결 중".
+    clearTimeout(startWatchdog);
+    startWatchdog = setTimeout(function () {
+      if (state.listening && !state.running) {
+        stop();
+        showBanner(
+          "<strong>음성인식 엔진이 응답하지 않습니다.</strong> " +
+          "앱 안의 화면에서 열었다면 <strong>Chrome</strong>으로 다시 열어 주세요. " +
+          "Chrome인데도 계속된다면 인터넷 연결과 마이크 권한을 확인하세요.",
+          true
+        );
+      }
+    }, 6000);
+  }
+
+  function stop() {
+    if (!state.listening) {
+      setStatus("대기 중", false);
+      return;
+    }
+    state.listening = false;
+    clearTimeout(startWatchdog);
+    el.rec.setAttribute("data-on", "false");
+    el.recLabel.textContent = "녹음 시작";
+    setStatus("대기 중", false);
+    try {
+      rec.stop();
+    } catch (e) { /* engine already stopped */ }
+  }
+
+  function toggle() {
+    if (state.listening) stop(); else start();
+  }
+
+  /* ---------- wiring ---------- */
+
+  el.conds.addEventListener("click", function (event) {
+    var btn = event.target.closest(".chip");
+    if (!btn) return;
+    state.condition = btn.getAttribute("data-c");
+    Array.prototype.forEach.call(el.conds.querySelectorAll(".chip"), function (c) {
+      c.setAttribute("aria-pressed", c === btn ? "true" : "false");
+    });
+  });
+
+  el.rec.addEventListener("click", toggle);
+
+  // Backgrounding the page tears down the audio session; stop cleanly
+  // rather than leaving the UI stuck on "듣는 중".
+  document.addEventListener("visibilitychange", function () {
+    if (document.hidden && state.listening) stop();
+  });
+
+  el.btnExport.addEventListener("click", function () {
+    if (!state.entries.length) {
+      el.exportBox.textContent = "기록이 없습니다.";
+      el.exportBox.classList.add("show");
+      return;
+    }
+    var rated = state.entries.filter(function (e) { return e.verdict; });
+    var ok = state.entries.filter(function (e) { return e.verdict === "correct"; });
+    var lines = [];
+    lines.push("LiftVoice STT 테스트 결과");
+    lines.push("총 " + state.entries.length + "발화 / 평가 " + rated.length + " / 정확 " + ok.length +
+      (rated.length ? " / 인식률 " + Math.round((ok.length / rated.length) * 100) + "%" : ""));
+    lines.push("");
+    state.entries.forEach(function (e, i) {
+      var mark = e.verdict === "correct" ? "O" : (e.verdict === "wrong" ? "X" : "-");
+      lines.push((i + 1) + ". [" + mark + "] " + e.time + " (" + e.condition + ")");
+      lines.push("   인식: " + e.text);
+      if (e.verdict === "wrong" && e.truth) lines.push("   실제: " + e.truth);
+    });
+    var text = lines.join("\n");
+    el.exportBox.textContent = text;
+    el.exportBox.classList.add("show");
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () {
+        el.btnExport.textContent = "복사됨";
+        setTimeout(function () { el.btnExport.textContent = "결과 보기 / 복사"; }, 1600);
+      }, function () { /* clipboard blocked: the text is on screen to select */ });
+    }
+  });
+
+  el.btnClear.addEventListener("click", function () {
+    if (!state.entries.length) return;
+    if (el.btnClear.getAttribute("data-armed") === "true") {
+      state.entries = [];
+      save();
+      renderLog();
+      renderStats();
+      el.exportBox.classList.remove("show");
+      el.btnClear.textContent = "전체 삭제";
+      el.btnClear.removeAttribute("data-armed");
+      return;
+    }
+    el.btnClear.textContent = "정말 삭제? 한 번 더";
+    el.btnClear.setAttribute("data-armed", "true");
+    setTimeout(function () {
+      el.btnClear.textContent = "전체 삭제";
+      el.btnClear.removeAttribute("data-armed");
+    }, 3000);
+  });
+
+  /* ---------- boot ---------- */
+
+  load();
+  renderLog();
+  renderStats();
+
+  // Android WebView exposes SpeechRecognition but never fires its events,
+  // so this must be checked before the constructor test below.
+  if (/;\s*wv[;)]/.test(navigator.userAgent)) {
+    el.rec.disabled = true;
+    el.recLabel.textContent = "Chrome에서 열어 주세요";
+    setStatus("사용 불가", false);
+    showBanner(
+      "<strong>앱 내장 화면에서는 음성인식이 동작하지 않습니다.</strong> " +
+      "우측 상단 메뉴의 <strong>브라우저에서 열기</strong>로 <strong>Chrome</strong>에서 열어 주세요.",
+      true
+    );
+    return;
+  }
+
+  if (!SR) {
+    el.rec.disabled = true;
+    el.recLabel.textContent = "지원되지 않음";
+    setStatus("사용 불가", false);
+    showBanner(
+      "<strong>이 브라우저는 음성인식을 지원하지 않습니다.</strong> 갤럭시 S24에서는 <strong>Chrome</strong>으로 열어 주세요. (삼성 인터넷·Firefox는 미지원)",
+      true
+    );
+    return;
+  }
+
+  if (!window.isSecureContext) {
+    el.rec.disabled = true;
+    setStatus("사용 불가", false);
+    showBanner("<strong>보안 연결(HTTPS)이 아닙니다.</strong> 마이크를 쓸 수 없습니다.", true);
+    return;
+  }
+
+  rec = buildRecognizer();
+})();
+</script>
