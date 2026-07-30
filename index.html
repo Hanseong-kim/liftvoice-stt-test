@@ -520,6 +520,566 @@
     line-height: 1.6;
   }
 
+  .session-meta-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  /* ---- routine overlay ---- */
+  .routine-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    display: none;
+  }
+  .routine-overlay.show { display: block; }
+  .routine-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+  }
+  .routine-sheet {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    max-height: 82vh;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-bottom: none;
+    border-radius: 16px 16px 0 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  @media (min-width: 900px) {
+    .routine-sheet {
+      left: auto;
+      right: 24px;
+      top: 24px;
+      bottom: 24px;
+      width: 380px;
+      max-height: none;
+      border-radius: var(--r);
+      border-bottom: 1px solid var(--line);
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
+    }
+  }
+  .routine-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--line);
+    flex: none;
+  }
+  .routine-head-title {
+    font-size: 16px;
+    font-weight: 650;
+  }
+  .routine-close {
+    font: inherit;
+    font-size: 13px;
+    padding: 8px 12px;
+    min-height: 40px;
+    border-radius: 8px;
+    border: 1px solid var(--line);
+    background: var(--surface-2);
+    color: var(--ink);
+    cursor: pointer;
+  }
+  .routine-body {
+    overflow-y: auto;
+    padding: 12px 16px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .routine-part-name {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+  .routine-ex-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .routine-add-btn {
+    font: inherit;
+    font-size: 13px;
+    padding: 10px 12px;
+    min-height: 40px;
+    width: 100%;
+    margin-top: 8px;
+    border-radius: 10px;
+    border: 1px dashed var(--line);
+    background: none;
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .routine-add-form {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 8px;
+    padding: 12px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--surface-2);
+  }
+  .routine-add-form input {
+    font: inherit;
+    font-size: 14px;
+    padding: 8px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--line);
+    background: var(--bg);
+    color: var(--ink);
+    min-height: 38px;
+  }
+  .routine-add-form-name { width: 100%; }
+  .routine-add-form-row {
+    display: flex;
+    gap: 8px;
+  }
+  .routine-add-form-row input {
+    flex: 1;
+    min-width: 0;
+    text-align: center;
+  }
+  .routine-add-form-input-sm {
+    font-size: 12px !important;
+  }
+  .routine-add-form-input-sm::placeholder {
+    font-size: 11px;
+  }
+  .routine-add-form-actions {
+    display: flex;
+    gap: 8px;
+  }
+  .routine-add-save {
+    font: inherit;
+    font-size: 13px;
+    flex: 1;
+    min-height: 40px;
+    border-radius: 8px;
+    border: 1px solid var(--good);
+    background: var(--good);
+    color: var(--surface);
+    font-weight: 650;
+    cursor: pointer;
+  }
+  .routine-add-cancel {
+    font: inherit;
+    font-size: 13px;
+    flex: 1;
+    min-height: 40px;
+    border-radius: 8px;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--ink);
+    cursor: pointer;
+  }
+  .routine-ex-detail-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 4px;
+  }
+  .routine-ex-goto {
+    font: inherit;
+    font-size: 12px;
+    padding: 8px 10px;
+    min-height: 34px;
+    border-radius: 8px;
+    border: 1px solid var(--accent);
+    background: none;
+    color: var(--accent);
+    cursor: pointer;
+  }
+  .routine-ex-goto:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+  .routine-ex-delete {
+    font: inherit;
+    font-size: 12px;
+    padding: 8px 10px;
+    min-height: 34px;
+    border-radius: 8px;
+    border: 1px solid var(--hot);
+    background: none;
+    color: var(--hot);
+    cursor: pointer;
+  }
+  .routine-ex-delete:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+  .routine-ex {
+    font: inherit;
+    text-align: left;
+    width: 100%;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 10px 12px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .routine-ex[data-status="진행중"] { border-color: var(--accent); }
+  .routine-ex-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .routine-ex-name {
+    font-size: 15px;
+    font-weight: 600;
+  }
+  .routine-ex-status {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 999px;
+    flex: none;
+  }
+  .routine-ex-status[data-status="완료"] { background: color-mix(in srgb, var(--good) 20%, transparent); color: var(--good); }
+  .routine-ex-status[data-status="진행중"] { background: color-mix(in srgb, var(--accent) 20%, transparent); color: var(--accent); }
+  .routine-ex-status[data-status="예정"] { background: var(--surface); color: var(--muted); border: 1px solid var(--line); }
+  .routine-ex-sub {
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .routine-ex-detail {
+    margin-top: 6px;
+    padding-top: 8px;
+    border-top: 1px dashed var(--line);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .routine-ex-detail .lbl {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-right: 6px;
+  }
+  .routine-ex-detail .set-row { font-size: 13px; }
+  .routine-ex-detail .comment-row { color: var(--muted); font-size: 12px; }
+
+  .session-next-set {
+    font-size: 13.5px;
+    font-weight: 650;
+    color: var(--accent);
+  }
+
+  .type-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .type-input {
+    font: inherit;
+    font-size: 16px;
+    flex: 1;
+    min-height: 44px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--ink);
+  }
+
+  .session-rest-setting {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .session-rest-setting .set-num-input { width: 64px; }
+
+  .unit-toggle-row { display: flex; gap: 8px; }
+
+  .session-rest-timer {
+    display: none;
+    font-family: var(--font-mono);
+    font-size: 15px;
+    font-weight: 650;
+    letter-spacing: 0.02em;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: var(--surface-2);
+    color: var(--accent);
+    text-align: center;
+  }
+  .session-rest-timer.show { display: block; }
+  .session-rest-timer.done { color: var(--good); }
+
+  .set-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .set-label { flex: none; }
+  .set-fields {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    flex: none;
+  }
+  .set-num-input {
+    font: inherit;
+    width: 56px;
+    min-height: 34px;
+    padding: 4px 6px;
+    border-radius: 6px;
+    border: 1px solid var(--line);
+    background: var(--bg);
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+  }
+  .set-unit { font-size: 13px; color: var(--muted); flex: none; }
+  .set-check-btn {
+    font: inherit;
+    font-size: 12px;
+    padding: 6px 10px;
+    min-height: 32px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    flex: none;
+  }
+  .set-check-btn[data-done="true"] {
+    background: var(--good);
+    border-color: var(--good);
+    color: var(--surface);
+    font-weight: 600;
+  }
+  .set-check-btn[data-locked="true"] {
+    opacity: 0.6;
+    cursor: default;
+  }
+  .set-memo-btn {
+    font: inherit;
+    font-size: 11px;
+    padding: 4px 8px;
+    min-height: 28px;
+    border-radius: 6px;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    flex: none;
+  }
+  .set-memo-input {
+    font: inherit;
+    font-size: 13px;
+    width: 100%;
+    margin-top: 6px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    border: 1px solid var(--line);
+    background: var(--bg);
+    color: var(--ink);
+  }
+  .set-memo-text {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+  .session-set-next { border: 1px solid var(--accent); font-weight: 600; }
+  .session-set-future { opacity: 0.55; }
+  .session-rest-hint {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    text-align: center;
+    padding: 2px 0;
+  }
+
+  .cmd-group { margin-bottom: 18px; }
+  .cmd-group:last-child { margin-bottom: 0; }
+  .cmd-group-title {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+  .cmd-item {
+    padding: 8px 0;
+    border-bottom: 1px dashed var(--line);
+  }
+  .cmd-item:last-child { border-bottom: none; }
+  .cmd-example {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--ink);
+    word-break: keep-all;
+  }
+  .cmd-desc {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+  .cmd-note {
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.6;
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px solid var(--line);
+  }
+
+  :root[data-vibe="power"] {
+    --accent: oklch(0.68 0.19 45);
+    --accent-ink: #241000;
+  }
+  [data-vibe="power"] h1,
+  [data-vibe="power"] #session-exercise-name,
+  [data-vibe="power"] .script-line {
+    text-transform: uppercase;
+    letter-spacing: -0.01em;
+    font-weight: 800;
+  }
+  [data-vibe="power"] .eyebrow { color: var(--accent); font-weight: 700; }
+  [data-vibe="power"] .rec { text-transform: uppercase; letter-spacing: 0.04em; }
+
+  body.focus-active .stats,
+  body.focus-active .log,
+  body.focus-active .empty,
+  body.focus-active .tools,
+  body.focus-active .export,
+  body.focus-active .note,
+  body.focus-active .live,
+  body.focus-active > .wrap > div:has(#conds) {
+    display: none;
+  }
+  body.focus-active #session-exercise-name { font-size: clamp(2rem, 9vw, 3rem); }
+  body.focus-active #session-rest-timer { font-size: 22px; padding: 18px; }
+  body.focus-active .rec { min-height: 84px; font-size: 22px; }
+  body.focus-active #session-panel { padding: 22px; }
+
+  .tweaks-toggle {
+    position: fixed;
+    top: 14px;
+    right: 14px;
+    z-index: 55;
+    font: inherit;
+    font-size: 12px;
+    padding: 8px 12px;
+    min-height: 36px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .tweaks-panel {
+    position: fixed;
+    top: 14px;
+    right: 14px;
+    z-index: 56;
+    width: 260px;
+    max-width: calc(100vw - 28px);
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--r);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
+    display: none;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .tweaks-panel.show { display: flex; }
+  .tweaks-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--line);
+  }
+  .tweaks-title { font-size: 14px; font-weight: 650; }
+  .tweaks-close {
+    font: inherit;
+    font-size: 12px;
+    padding: 6px 10px;
+    min-height: 32px;
+    border-radius: 8px;
+    border: 1px solid var(--line);
+    background: var(--surface-2);
+    color: var(--ink);
+    cursor: pointer;
+  }
+  .tweaks-body { padding: 14px; display: flex; flex-direction: column; gap: 14px; }
+  .tweaks-group { display: flex; flex-direction: column; gap: 8px; }
+  .tweaks-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .tweaks-row { display: flex; gap: 8px; }
+  .tweaks-opt {
+    font: inherit;
+    font-size: 13px;
+    flex: 1;
+    min-height: 40px;
+    border-radius: 8px;
+    border: 1px solid var(--line);
+    background: var(--surface-2);
+    color: var(--ink);
+    cursor: pointer;
+  }
+  .tweaks-opt[aria-pressed="true"] {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-ink);
+    font-weight: 600;
+  }
+  .tweaks-toggle-btn {
+    font: inherit;
+    font-size: 13px;
+    min-height: 40px;
+    width: 100%;
+    border-radius: 8px;
+    border: 1px solid var(--line);
+    background: var(--surface-2);
+    color: var(--ink);
+    cursor: pointer;
+  }
+  .tweaks-toggle-btn[aria-pressed="true"] {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-ink);
+    font-weight: 600;
+  }
+
   :focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
@@ -557,10 +1117,21 @@
   <div class="script-panel" id="session-panel">
     <div class="script-meta">
       <span id="session-part-name">어깨</span>
-      <span id="session-progress">1 / 3 종목</span>
+      <span class="session-meta-right">
+        <span id="session-progress">1 / 3 종목</span>
+        <button class="skip" type="button" id="btn-help-open">명령어</button>
+        <button class="skip" type="button" id="btn-routine-overview">전체 루틴</button>
+      </span>
     </div>
     <div class="script-line" id="session-exercise-name">오버헤드프레스</div>
     <div class="session-target" id="session-target">목표 4세트 × 6~8회 · 0/4</div>
+    <div class="session-next-set" id="session-next-set"></div>
+    <div class="session-rest-setting">
+      <span>세트당 휴식</span>
+      <input type="number" class="set-num-input" id="session-rest-input" min="0" step="5" inputmode="numeric">
+      <span>초</span>
+    </div>
+    <div class="session-rest-timer" id="session-rest-timer"></div>
     <div class="session-log" id="session-log"></div>
     <div class="banner" id="session-sub-banner"></div>
     <div class="script-actions" id="session-sub-actions">
@@ -606,6 +1177,14 @@
     </div>
   </div>
 
+  <div>
+    <div class="field-label">텍스트로 입력 (마이크 대체 · 음성 명령과 동일하게 처리됨)</div>
+    <div class="type-row">
+      <input type="text" class="type-input" id="type-input" placeholder='예: "45키로 8개", "다음 종목"'>
+      <button class="tbtn" type="button" id="btn-type-send">전송</button>
+    </div>
+  </div>
+
   <div class="log" id="log"></div>
   <div class="empty" id="empty">아직 기록된 발화가 없습니다.</div>
 
@@ -623,11 +1202,175 @@
 
 </div>
 
+<button class="tweaks-toggle" id="tweaks-toggle" type="button">설정</button>
+<div class="tweaks-panel" id="tweaks-panel" aria-hidden="true">
+  <div class="tweaks-head">
+    <div class="tweaks-title">설정</div>
+    <button class="tweaks-close" type="button" id="tweaks-close">닫기</button>
+  </div>
+  <div class="tweaks-body">
+    <div class="tweaks-group">
+      <div class="tweaks-label">세션 분위기</div>
+      <div class="tweaks-row" id="tweaks-vibe">
+        <button class="tweaks-opt" type="button" data-vibe-opt="calm" aria-pressed="true">차분하게</button>
+        <button class="tweaks-opt" type="button" data-vibe-opt="power" aria-pressed="false">파워풀하게</button>
+      </div>
+    </div>
+    <div class="tweaks-group">
+      <div class="tweaks-label">무게 단위</div>
+      <div class="tweaks-row unit-toggle-row" id="tweaks-unit">
+        <button class="tweaks-opt" type="button" data-unit-opt="kg" aria-pressed="true">kg</button>
+        <button class="tweaks-opt" type="button" data-unit-opt="lb" aria-pressed="false">lb</button>
+      </div>
+    </div>
+    <div class="tweaks-group">
+      <div class="tweaks-label">집중 모드</div>
+      <button class="tweaks-toggle-btn" id="tweaks-focus" type="button" aria-pressed="false">세션 중 화면 단순화</button>
+    </div>
+    <div class="tweaks-group">
+      <div class="tweaks-label">코칭 톤</div>
+      <div class="tweaks-row" id="tweaks-tone">
+        <button class="tweaks-opt" type="button" data-tone-opt="calm" aria-pressed="true">담백하게</button>
+        <button class="tweaks-opt" type="button" data-tone-opt="power" aria-pressed="false">힘있게</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="bar">
   <div class="bar-inner">
     <button class="rec" type="button" id="rec" data-on="false">
       <span id="rec-label">녹음 시작</span>
     </button>
+  </div>
+</div>
+
+<div class="routine-overlay" id="routine-overlay" aria-hidden="true">
+  <div class="routine-backdrop" id="routine-backdrop"></div>
+  <div class="routine-sheet" id="routine-sheet" role="dialog" aria-modal="true" aria-label="오늘 전체 루틴">
+    <div class="routine-head">
+      <div class="routine-head-title">오늘 전체 루틴</div>
+      <button class="routine-close" type="button" id="btn-routine-close">닫기</button>
+    </div>
+    <div class="routine-body" id="routine-body"></div>
+  </div>
+</div>
+
+<div class="routine-overlay" id="help-overlay" aria-hidden="true">
+  <div class="routine-backdrop" id="help-backdrop"></div>
+  <div class="routine-sheet" id="help-sheet" role="dialog" aria-modal="true" aria-label="사용 가능한 명령어">
+    <div class="routine-head">
+      <div class="routine-head-title">사용 가능한 명령어</div>
+      <button class="routine-close" type="button" id="btn-help-close">닫기</button>
+    </div>
+    <div class="routine-body" id="help-body">
+
+      <div class="cmd-group">
+        <div class="cmd-group-title">세트 기록</div>
+        <div class="cmd-item">
+          <div class="cmd-example">20키로 8개 / 20키로 8회 / 20키로 8번</div>
+          <div class="cmd-desc">무게+반복수로 세트 기록</div>
+        </div>
+        <div class="cmd-item">
+          <div class="cmd-example">8개</div>
+          <div class="cmd-desc">무게를 생략하면 직전 세트와 같은 무게로 기록</div>
+        </div>
+        <div class="cmd-item">
+          <div class="cmd-example">20파운드 8개</div>
+          <div class="cmd-desc">파운드로 말해도 자동으로 kg 환산해 기록</div>
+        </div>
+        <div class="cmd-item">
+          <div class="cmd-example">스무키로 여덟개 / 백키로 다섯개</div>
+          <div class="cmd-desc">한국어 숫자도 자동으로 변환됨</div>
+        </div>
+      </div>
+
+      <div class="cmd-group">
+        <div class="cmd-group-title">방금 기록한 세트 수정</div>
+        <div class="cmd-item">
+          <div class="cmd-example">방금 세트 2.5키로 더</div>
+          <div class="cmd-desc">마지막 세트 무게를 2.5kg 늘림</div>
+        </div>
+        <div class="cmd-item">
+          <div class="cmd-example">방금 세트 5키로 빼</div>
+          <div class="cmd-desc">마지막 세트 무게를 5kg 줄임</div>
+        </div>
+        <div class="cmd-item">
+          <div class="cmd-example">방금 세트 5파운드 더</div>
+          <div class="cmd-desc">파운드 단위로도 가감 가능</div>
+        </div>
+        <div class="cmd-item">
+          <div class="cmd-example">방금 거 6개로 수정</div>
+          <div class="cmd-desc">마지막 세트 반복수를 6으로 정정</div>
+        </div>
+      </div>
+
+      <div class="cmd-group">
+        <div class="cmd-group-title">메모 / 컨디션</div>
+        <div class="cmd-item">
+          <div class="cmd-example">코멘트 어깨 뻐근함 / 메모 ...</div>
+          <div class="cmd-desc">방금 세트(없으면 종목)에 메모로 남김</div>
+        </div>
+        <div class="cmd-item">
+          <div class="cmd-example">지금 힘들어 / 컨디션 별로</div>
+          <div class="cmd-desc">[컨디션] 태그로 기록하고 짧은 응답 표시</div>
+        </div>
+      </div>
+
+      <div class="cmd-group">
+        <div class="cmd-group-title">장비 제약 대체 제안</div>
+        <div class="cmd-item">
+          <div class="cmd-example">자리 없어 / 기구 없어 / 없어서 / 없네</div>
+          <div class="cmd-desc">현재 종목의 대체 후보 제시 (등록된 종목만)</div>
+        </div>
+      </div>
+
+      <div class="cmd-group">
+        <div class="cmd-group-title">루틴 / 종목 확인</div>
+        <div class="cmd-item">
+          <div class="cmd-example">전체 루틴 / 루틴 보여줘 / 루틴 확인 / 오늘 루틴</div>
+          <div class="cmd-desc">전체 루틴 패널 열기</div>
+        </div>
+        <div class="cmd-item">
+          <div class="cmd-example">등 운동 뭐 남았어 / 등 얼마나 남았어</div>
+          <div class="cmd-desc">해당 파트로 스크롤된 전체 루틴 패널 열기</div>
+        </div>
+        <div class="cmd-item">
+          <div class="cmd-example">오버헤드프레스 몇 세트야</div>
+          <div class="cmd-desc">해당 종목 상세로 전체 루틴 패널 열기</div>
+        </div>
+      </div>
+
+      <div class="cmd-group">
+        <div class="cmd-group-title">목표 세트 수 조정</div>
+        <div class="cmd-item">
+          <div class="cmd-example">3세트만</div>
+          <div class="cmd-desc">목표 세트를 3으로 고정</div>
+        </div>
+        <div class="cmd-item">
+          <div class="cmd-example">세트 하나 빼자</div>
+          <div class="cmd-desc">목표 세트를 1 줄임</div>
+        </div>
+      </div>
+
+      <div class="cmd-group">
+        <div class="cmd-group-title">진행 / 종료</div>
+        <div class="cmd-item">
+          <div class="cmd-example">다음 종목</div>
+          <div class="cmd-desc">다음 종목으로 이동</div>
+        </div>
+        <div class="cmd-item">
+          <div class="cmd-example">오늘 끝 / 운동 끝</div>
+          <div class="cmd-desc">세션 종료 + 요약 내보내기</div>
+        </div>
+      </div>
+
+      <div class="cmd-note">
+        위 예시와 정확히 같은 어순·형식이어야 인식됩니다. 벗어나면 로그에는 남지만 세트에는 반영되지 않아요.
+        음성·텍스트 명령 없이도 <strong>완료 체크 버튼</strong>, <strong>전체 루틴 패널의 종목 추가/삭제/이동</strong>으로 클릭만으로 전부 조작할 수 있습니다.
+      </div>
+
+    </div>
   </div>
 </div>
 
@@ -639,6 +1382,78 @@
   var STORE = "liftvoice.stt.v1";
 
   var STORE_SESSION = "liftvoice.session.v1";
+  var STORE_TWEAKS = "liftvoice.tweaks.v1";
+
+  var tweaks = { vibe: "calm", focus: false, tone: "calm", unit: "kg" };
+
+  var KG_TO_LB = 2.2046226218;
+
+  function kgToLb(kg) { return Math.round(kg * KG_TO_LB * 10) / 10; }
+  function lbToKgVal(lb) { return Math.round((lb / KG_TO_LB) * 10) / 10; }
+
+  // 저장은 항상 kg. 화면에 보여줄 때만 현재 단위로 변환한다.
+  function displayWeight(kg) { return tweaks.unit === "lb" ? kgToLb(kg) : kg; }
+  function toStoredKg(displayVal) { return tweaks.unit === "lb" ? lbToKgVal(displayVal) : displayVal; }
+  function weightUnitLabel() { return tweaks.unit === "lb" ? "lb" : "kg"; }
+
+  function loadTweaks() {
+    try {
+      var raw = localStorage.getItem(STORE_TWEAKS);
+      if (raw) {
+        var parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === "object") {
+          if (parsed.vibe === "power") tweaks.vibe = "power";
+          if (parsed.tone === "power") tweaks.tone = "power";
+          if (parsed.unit === "lb") tweaks.unit = "lb";
+          tweaks.focus = !!parsed.focus;
+        }
+      }
+    } catch (e) { /* corrupt or unavailable storage: use defaults */ }
+  }
+
+  function saveTweaks() {
+    try { localStorage.setItem(STORE_TWEAKS, JSON.stringify(tweaks)); } catch (e) { /* quota or private mode */ }
+  }
+
+  var TONE_COPY = {
+    condition: { calm: "기록했어요. 무리하지 마세요.", power: "기록 완료! 페이스 조절하면서 끝까지 밀어붙이자." },
+    noSub: {
+      calm: "이 종목은 등록된 대체 후보가 없어요. 직접 판단해서 진행하세요.",
+      power: "대체 후보가 없어요 — 지금 있는 걸로 그냥 밀어붙이자!"
+    }
+  };
+
+  function toneCopy(key) {
+    var entry = TONE_COPY[key];
+    return entry[tweaks.tone] || entry.calm;
+  }
+
+  function restCountdownText(remaining) {
+    return tweaks.tone === "power" ? (remaining + "초만 더, 가자!") : ("휴식 " + remaining + "초");
+  }
+
+  function restDoneText() {
+    return tweaks.tone === "power" ? "휴식 끝, 바로 간다!" : "휴식 종료 · 다음 세트 준비";
+  }
+
+  function applyTweaks() {
+    document.documentElement.setAttribute("data-vibe", tweaks.vibe);
+    document.body.classList.toggle("focus-active", tweaks.focus && state.mode === "session");
+  }
+
+  function syncTweaksUI() {
+    Array.prototype.forEach.call(document.querySelectorAll("#tweaks-vibe .tweaks-opt"), function (b) {
+      b.setAttribute("aria-pressed", b.getAttribute("data-vibe-opt") === tweaks.vibe ? "true" : "false");
+    });
+    Array.prototype.forEach.call(document.querySelectorAll("#tweaks-tone .tweaks-opt"), function (b) {
+      b.setAttribute("aria-pressed", b.getAttribute("data-tone-opt") === tweaks.tone ? "true" : "false");
+    });
+    Array.prototype.forEach.call(document.querySelectorAll("#tweaks-unit .tweaks-opt"), function (b) {
+      b.setAttribute("aria-pressed", b.getAttribute("data-unit-opt") === tweaks.unit ? "true" : "false");
+    });
+    var focusBtn = document.getElementById("tweaks-focus");
+    if (focusBtn) focusBtn.setAttribute("aria-pressed", tweaks.focus ? "true" : "false");
+  }
 
   function buildInitialSession() {
     return {
@@ -655,6 +1470,7 @@
               isMain: ex.isMain,
               targetSets: ex.targetSets,
               targetReps: ex.targetReps.slice(),
+              restSec: ex.restSec,
               sets: [],
               comments: [],
               substitutedFrom: null
@@ -727,21 +1543,23 @@
     {
       name: "어깨",
       exercises: [
-        { id: "overhead_press", name: "오버헤드프레스", isMain: true, targetSets: 4, targetReps: [6, 8] },
-        { id: "lateral_raise", name: "사이드 레터럴 레이즈", isMain: false, targetSets: 4, targetReps: [12, 15] },
-        { id: "face_pull", name: "페이스풀/리어델트", isMain: false, targetSets: 3, targetReps: [15, 15] }
+        { id: "overhead_press", name: "오버헤드프레스", isMain: true, targetSets: 4, targetReps: [6, 8], restSec: 120 },
+        { id: "lateral_raise", name: "사이드 레터럴 레이즈", isMain: false, targetSets: 4, targetReps: [12, 15], restSec: 60 },
+        { id: "face_pull", name: "페이스풀/리어델트", isMain: false, targetSets: 3, targetReps: [15, 15], restSec: 60 }
       ]
     },
     {
       name: "등",
       exercises: [
-        { id: "pullup", name: "풀업", isMain: false, targetSets: 4, targetReps: [6, 10] },
-        { id: "barbell_row", name: "바벨/덤벨로우", isMain: false, targetSets: 4, targetReps: [8, 10] },
-        { id: "lat_pulldown", name: "랫풀다운", isMain: false, targetSets: 4, targetReps: [10, 12] },
-        { id: "seated_cable_row", name: "시티드 케이블 로우", isMain: false, targetSets: 3, targetReps: [12, 12] }
+        { id: "pullup", name: "풀업", isMain: false, targetSets: 4, targetReps: [6, 10], restSec: 120 },
+        { id: "barbell_row", name: "바벨/덤벨로우", isMain: false, targetSets: 4, targetReps: [8, 10], restSec: 90 },
+        { id: "lat_pulldown", name: "랫풀다운", isMain: false, targetSets: 4, targetReps: [10, 12], restSec: 75 },
+        { id: "seated_cable_row", name: "시티드 케이블 로우", isMain: false, targetSets: 3, targetReps: [12, 12], restSec: 60 }
       ]
     }
   ];
+
+  var PART_NAME_LIST = SESSION_ROUTINE.map(function (p) { return p.name; });
 
   var NUM_WORDS = {
     "영": "0", "공": "0", "하나": "1", "한": "1", "일": "1", "둘": "2", "두": "2", "이": "2",
@@ -753,10 +1571,10 @@
     "백": "100"
   };
 
-  function normalize(text) {
-    var s = String(text == null ? "" : text).toLowerCase();
-    // Preserve decimal points: only strip periods NOT between digits
-    s = s.replace(/[.,!?~"'`·…\-]/g, function(match, offset, str) {
+  // 음성인식(특히 크롬)이 최종 결과에 붙이는 마침표/쉼표 등을 제거한다.
+  // 소수점(예: "2.5")은 숫자 사이 마침표만 보존해서 지운다.
+  function stripPunctuation(s) {
+    return s.replace(/[.,!?~"'`·…\-]/g, function (match, offset, str) {
       if (match === ".") {
         var prevIsDigit = offset > 0 && /\d/.test(str[offset - 1]);
         var nextIsDigit = offset < str.length - 1 && /\d/.test(str[offset + 1]);
@@ -766,14 +1584,20 @@
       }
       return " ";
     });
+  }
+
+  function normalize(text) {
+    var s = String(text == null ? "" : text).toLowerCase();
+    s = stripPunctuation(s);
     s = s.replace(/kg|킬로그램|킬로|키로/g, "키로");
+    s = s.replace(/lbs|lb|파운드/g, "파운드");
     s = s.replace(/초간|초동안/g, "초");
     var parts = s.split(/\s+/).filter(function (w) { return w.length > 0; });
     var originals = parts.slice();
 
     // Handle counter-attached number words (e.g., "다섯개" → "5개")
     parts = parts.map(function (w) {
-      var match = w.match(/^(.+?)(개|초|키로)$/);
+      var match = w.match(/^(.+?)(개|초|키로|파운드)$/);
       if (match) {
         var prefix = match[1];
         var counter = match[2];
@@ -798,8 +1622,8 @@
         // Only merge if BOTH original tokens are Korean words (not digits) with no suffixes
         var currIsKoreanWord = !/^\d/.test(origCurr);
         var nextIsKoreanWord = !/^\d/.test(origNext);
-        var currHasSuffix = /[개초키로]$/.test(origCurr);
-        var nextHasSuffix = /[개초키로]$/.test(origNext);
+        var currHasSuffix = /[개초키로파운드]$/.test(origCurr);
+        var nextHasSuffix = /[개초키로파운드]$/.test(origNext);
 
         if (currIsKoreanWord && nextIsKoreanWord && !currHasSuffix && !nextHasSuffix) {
           var curr = parts[i];
@@ -824,7 +1648,7 @@
     var filtered = [];
     for (var i = 0; i < parts.length; i++) {
       var curr = parts[i];
-      var isUnit = curr === "개" || curr === "초" || curr === "키로";
+      var isUnit = curr === "개" || curr === "초" || curr === "키로" || curr === "파운드";
 
       if (isUnit && filtered.length > 0) {
         var prev = filtered[filtered.length - 1];
@@ -848,10 +1672,12 @@
 
   function wordsToDigitString(text) {
     var s = String(text == null ? "" : text).toLowerCase();
+    s = stripPunctuation(s);
     s = s.replace(/kg|킬로그램|킬로|키로/g, "키로");
+    s = s.replace(/lbs|lb|파운드/g, "파운드");
     var words = s.split(/\s+/).filter(function (w) { return w.length > 0; });
     var out = words.map(function (w) {
-      var m = w.match(/^(.+?)(개|회|번|초|키로)$/);
+      var m = w.match(/^(.+?)(개|회|번|초|키로|파운드)$/);
       if (m && Object.prototype.hasOwnProperty.call(NUM_WORDS, m[1])) {
         return NUM_WORDS[m[1]] + m[2];
       }
@@ -866,12 +1692,13 @@
   function classifyCommand(rawText) {
     var text = wordsToDigitString(rawText).trim();
 
-    var adjustWeight = text.match(/방금\s*(?:세트|거)?\s*(\d+(?:\.\d+)?)\s*키로\s*(더|빼)/);
+    var adjustWeight = text.match(/방금\s*(?:세트|거)?\s*(\d+(?:\.\d+)?)\s*(키로|파운드)\s*(더|빼)/);
     if (adjustWeight) {
+      var adjustRaw = parseFloat(adjustWeight[1]);
       return {
         type: "SET_ADJUST_WEIGHT",
-        amountKg: parseFloat(adjustWeight[1]),
-        direction: adjustWeight[2] === "더" ? "add" : "subtract"
+        amountKg: adjustWeight[2] === "파운드" ? lbToKgVal(adjustRaw) : adjustRaw,
+        direction: adjustWeight[3] === "더" ? "add" : "subtract"
       };
     }
 
@@ -893,6 +1720,21 @@
       return { type: "SUBSTITUTE_REQUEST" };
     }
 
+    if (/전체\s*루틴|루틴\s*(?:전체)?\s*보여줘|루틴\s*확인|오늘\s*루틴/.test(text)) {
+      return { type: "ROUTINE_OVERVIEW" };
+    }
+
+    var partRemainRe = new RegExp("(" + PART_NAME_LIST.join("|") + ")\\s*(?:운동)?\\s*(?:은|는)?\\s*(?:뭐가?\\s*남았|얼마나\\s*남았|남은\\s*거)");
+    var partRemainMatch = text.match(partRemainRe);
+    if (partRemainMatch) {
+      return { type: "PART_REMAINING", partQuery: partRemainMatch[1] };
+    }
+
+    var exerciseQueryMatch = text.match(/^(.+?)\s*(?:는|은|이|가)?\s*몇\s*세트(?:야|예요|입니까|인가요|이야)?\??$/);
+    if (exerciseQueryMatch) {
+      return { type: "EXERCISE_QUERY", nameQuery: exerciseQueryMatch[1].trim() };
+    }
+
     var targetSetsExact = text.match(/^(\d+)\s*세트만$/);
     if (targetSetsExact) {
       return { type: "TARGET_ADJUST", mode: "set", targetSets: parseInt(targetSetsExact[1], 10) };
@@ -910,12 +1752,14 @@
     }
 
     // UI가 "목표 4세트 × 6~8회"라고 보여주므로 "회"/"번"도 "개"와 동일하게 받는다.
-    var setLog = text.match(/^(?:(\d+(?:\.\d+)?)\s*키로\s*)?(\d+)\s*(?:개|회|번)$/);
+    // 무게는 "키로"(kg) 또는 "파운드"(lb)로 말할 수 있고, lb는 항상 kg로 환산해 저장한다.
+    var setLog = text.match(/^(?:(\d+(?:\.\d+)?)\s*(키로|파운드)\s*)?(\d+)\s*(?:개|회|번)$/);
     if (setLog) {
+      var setLogRaw = setLog[1] ? parseFloat(setLog[1]) : null;
       return {
         type: "SET_LOG",
-        weightKg: setLog[1] ? parseFloat(setLog[1]) : null,
-        reps: parseInt(setLog[2], 10)
+        weightKg: setLogRaw == null ? null : (setLog[2] === "파운드" ? lbToKgVal(setLogRaw) : setLogRaw),
+        reps: parseInt(setLog[3], 10)
       };
     }
 
@@ -976,6 +1820,13 @@
       ["8번", { type: "SET_LOG", weightKg: null, reps: 8 }],
       ["여덟번", { type: "SET_LOG", weightKg: null, reps: 8 }],
       ["45키로 여덟 회", { type: "SET_LOG", weightKg: 45, reps: 8 }],
+      ["20키로 8개.", { type: "SET_LOG", weightKg: 20, reps: 8 }],
+      ["다음 종목.", { type: "NEXT_EXERCISE" }],
+      ["45파운드 8개", { type: "SET_LOG", weightKg: 20.4, reps: 8 }],
+      ["방금 세트 5파운드 더", { type: "SET_ADJUST_WEIGHT", amountKg: 2.3, direction: "add" }],
+      ["전체 루틴 보여줘", { type: "ROUTINE_OVERVIEW" }],
+      ["등 운동 뭐 남았어", { type: "PART_REMAINING", partQuery: "등" }],
+      ["오버헤드프레스 몇 세트야", { type: "EXERCISE_QUERY", nameQuery: "오버헤드프레스" }],
       ["아무말 대잔치", { type: "UNRECOGNIZED" }]
     ];
     var pass = 0, fail = 0, failures = [];
@@ -1008,6 +1859,8 @@
     exportBox: document.getElementById("export"),
     btnExport: document.getElementById("btn-export"),
     btnClear: document.getElementById("btn-clear"),
+    typeInput: document.getElementById("type-input"),
+    btnTypeSend: document.getElementById("btn-type-send"),
     modes: document.getElementById("modes"),
     scriptPanel: document.getElementById("script-panel"),
     scriptProgress: document.getElementById("script-progress"),
@@ -1022,12 +1875,24 @@
     sessionProgress: document.getElementById("session-progress"),
     sessionExerciseName: document.getElementById("session-exercise-name"),
     sessionTarget: document.getElementById("session-target"),
+    sessionNextSet: document.getElementById("session-next-set"),
+    sessionRestInput: document.getElementById("session-rest-input"),
+    sessionRestTimer: document.getElementById("session-rest-timer"),
     sessionLog: document.getElementById("session-log"),
     sessionSubBanner: document.getElementById("session-sub-banner"),
     sessionSubActions: document.getElementById("session-sub-actions"),
     btnSubApply: document.getElementById("btn-sub-apply"),
     btnSubDismiss: document.getElementById("btn-sub-dismiss"),
-    sessionCondBanner: document.getElementById("session-cond-banner")
+    sessionCondBanner: document.getElementById("session-cond-banner"),
+    btnRoutineOverview: document.getElementById("btn-routine-overview"),
+    routineOverlay: document.getElementById("routine-overlay"),
+    routineBackdrop: document.getElementById("routine-backdrop"),
+    routineBody: document.getElementById("routine-body"),
+    btnRoutineClose: document.getElementById("btn-routine-close"),
+    btnHelpOpen: document.getElementById("btn-help-open"),
+    helpOverlay: document.getElementById("help-overlay"),
+    helpBackdrop: document.getElementById("help-backdrop"),
+    btnHelpClose: document.getElementById("btn-help-close")
   };
 
   var state = {
@@ -1045,7 +1910,13 @@
     // 표시 전용(비영속) 배너 상태. renderSession()이 매 렌더마다 배너를
     // 강제로 숨기기 때문에, 배너를 렌더 사이에 살려두려면 state가 필요하다.
     sessionCondMessage: null,  // 컨디션 배너: 다음 종목/다음 컨디션 보고까지 유지
-    sessionSubMessage: null    // "대체 후보 없음" 일회성 안내: 다음 렌더에서 소진
+    sessionSubMessage: null,   // "대체 후보 없음" 일회성 안내: 다음 렌더에서 소진
+    routineOverlayOpen: false, // 전체 루틴 패널 표시 여부(비영속 — 세션 진행 상태와 무관)
+    routineExpandedId: null,   // 패널에서 펼쳐진 종목 id
+    routineAddingPart: null,   // 종목 추가 폼이 열려 있는 파트 인덱스(비영속)
+    editingSetKey: null,       // 메모 입력 중인 세트 인덱스(문자열, 비영속)
+    restEndsAt: null,          // 휴식 타이머 종료 시각(ms epoch, 비영속)
+    restIntervalId: null       // 휴식 타이머 setInterval id
   };
 
   var rec = null;
@@ -1251,20 +2122,20 @@
     el.sessionTarget.textContent =
       "목표 " + ex.targetSets + "세트 × " + repsLabel + "회 · " + ex.sets.length + "/" + ex.targetSets;
 
-    el.sessionLog.textContent = "";
-    ex.sets.slice().reverse().forEach(function (s, i) {
-      var setNum = ex.sets.length - i;
-      var row = document.createElement("div");
-      row.className = "session-set";
-      row.textContent = setNum + "세트: " + s.weight + "kg × " + s.reps + "회";
-      el.sessionLog.appendChild(row);
-    });
-    ex.comments.slice().reverse().forEach(function (c) {
-      var row = document.createElement("div");
-      row.className = "session-set comment";
-      row.textContent = c.text;
-      el.sessionLog.appendChild(row);
-    });
+    if (ex.sets.length >= ex.targetSets) {
+      el.sessionNextSet.textContent = "완료 · 목표 세트 다 채웠어요 — \"다음 종목\"이라고 말해보세요";
+    } else {
+      el.sessionNextSet.textContent =
+        "▶ 진행중 · " + part.name + " · " + ex.name + " · " + (ex.sets.length + 1) + "번째 세트 (" + repsLabel + "회 목표)";
+    }
+
+    // 사용자가 지금 이 입력칸에 타이핑 중이면 렌더가 값을 덮어쓰지 않게 한다.
+    if (el.sessionRestInput && document.activeElement !== el.sessionRestInput) {
+      el.sessionRestInput.value = ex.restSec || 90;
+    }
+
+    renderRestTimer();
+    renderSetPlan(ex);
 
     // 배너는 DOM이 아니라 state에서 렌더한다. 예전에는 여기서 무조건
     // 숨겼기 때문에 (a) 컨디션 배너가 같은 turn에 지워지고 (b) 대체 제안이
@@ -1292,6 +2163,674 @@
     }
   }
 
+  function computeExerciseStatus(partIdx, exIdx, ex) {
+    if (partIdx === state.session.currentPart && exIdx === state.session.currentExercise) {
+      return "진행중";
+    }
+    if (ex.targetSets > 0 && ex.sets.length >= ex.targetSets) return "완료";
+    if (ex.sets.length > 0) return "진행중";
+    return "예정";
+  }
+
+  function resolvePartQuery(query) {
+    var q = (query || "").trim();
+    if (!q) return null;
+    for (var i = 0; i < state.session.parts.length; i++) {
+      var name = state.session.parts[i].name;
+      if (name === q || q.indexOf(name) !== -1 || name.indexOf(q) !== -1) {
+        return { part: state.session.parts[i], idx: i };
+      }
+    }
+    return null;
+  }
+
+  function resolveExerciseQuery(query) {
+    var q = (query || "").trim();
+    if (!q) return null;
+    for (var pi = 0; pi < state.session.parts.length; pi++) {
+      var exercises = state.session.parts[pi].exercises;
+      for (var ei = 0; ei < exercises.length; ei++) {
+        var ex = exercises[ei];
+        var candidates = [ex.name];
+        if (ex.substitutedFrom) candidates.push(ex.substitutedFrom);
+        for (var c = 0; c < candidates.length; c++) {
+          var name = candidates[c];
+          if (name === q || q.indexOf(name) !== -1 || name.indexOf(q) !== -1) {
+            return { ex: ex, partIdx: pi, exIdx: ei };
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  function renderRoutineOverlay() {
+    el.routineBody.textContent = "";
+    state.session.parts.forEach(function (part, pIdx) {
+      var section = document.createElement("div");
+      section.className = "routine-part";
+      section.setAttribute("data-part-index", String(pIdx));
+
+      var heading = document.createElement("div");
+      heading.className = "routine-part-name";
+      heading.textContent = part.name;
+      section.appendChild(heading);
+
+      var list = document.createElement("div");
+      list.className = "routine-ex-list";
+
+      part.exercises.forEach(function (ex, eIdx) {
+        var status = computeExerciseStatus(pIdx, eIdx, ex);
+        // div + role=button: 펼친 상세 안에 삭제 <button>을 넣으려면 카드 자체는
+        // <button>이면 안 된다(button 안에 button은 유효한 HTML이 아님).
+        var card = document.createElement("div");
+        card.setAttribute("role", "button");
+        card.tabIndex = 0;
+        card.className = "routine-ex";
+        card.setAttribute("data-status", status);
+        card.setAttribute("data-ex-id", ex.id);
+
+        var row = document.createElement("div");
+        row.className = "routine-ex-row";
+
+        var nameEl = document.createElement("span");
+        nameEl.className = "routine-ex-name";
+        nameEl.textContent = ex.name;
+        row.appendChild(nameEl);
+
+        var statusEl = document.createElement("span");
+        statusEl.className = "routine-ex-status";
+        statusEl.setAttribute("data-status", status);
+        statusEl.textContent = status;
+        row.appendChild(statusEl);
+
+        card.appendChild(row);
+
+        var repsLabel = ex.targetReps[0] === ex.targetReps[1]
+          ? String(ex.targetReps[0])
+          : ex.targetReps[0] + "~" + ex.targetReps[1];
+        var sub = document.createElement("div");
+        sub.className = "routine-ex-sub";
+        sub.textContent = ex.targetSets + "세트 × " + repsLabel + "회 · " + ex.sets.length + "/" + ex.targetSets + " 완료" +
+          (ex.substitutedFrom ? " · 대체됨 (" + ex.substitutedFrom + " → " + ex.name + ")" : "");
+        card.appendChild(sub);
+
+        if (state.routineExpandedId === ex.id) {
+          var detail = document.createElement("div");
+          detail.className = "routine-ex-detail";
+
+          var target = document.createElement("div");
+          target.className = "set-row";
+          var tlbl = document.createElement("span");
+          tlbl.className = "lbl";
+          tlbl.textContent = "목표";
+          target.appendChild(tlbl);
+          target.appendChild(document.createTextNode(ex.targetSets + "세트 × " + repsLabel + "회"));
+          detail.appendChild(target);
+
+          var restInfo = document.createElement("div");
+          restInfo.className = "set-row";
+          var rlbl = document.createElement("span");
+          rlbl.className = "lbl";
+          rlbl.textContent = "세트당 휴식";
+          restInfo.appendChild(rlbl);
+          restInfo.appendChild(document.createTextNode((ex.restSec || 90) + "초"));
+          detail.appendChild(restInfo);
+
+          if (ex.sets.length) {
+            ex.sets.forEach(function (s, i) {
+              var setRow = document.createElement("div");
+              setRow.className = "set-row";
+              setRow.textContent = (i + 1) + "세트: " + displayWeight(s.weight) + weightUnitLabel() + " × " + s.reps + "회";
+              detail.appendChild(setRow);
+              if (s.comment) {
+                var setCmt = document.createElement("div");
+                setCmt.className = "comment-row";
+                setCmt.textContent = "메모: " + s.comment;
+                detail.appendChild(setCmt);
+              }
+            });
+          } else {
+            var noneRow = document.createElement("div");
+            noneRow.className = "comment-row";
+            noneRow.textContent = "아직 기록된 세트가 없습니다.";
+            detail.appendChild(noneRow);
+          }
+
+          if (ex.comments.length) {
+            ex.comments.forEach(function (c) {
+              var cRow = document.createElement("div");
+              cRow.className = "comment-row";
+              cRow.textContent = "메모: " + c.text;
+              detail.appendChild(cRow);
+            });
+          }
+
+          if (ex.substitutedFrom) {
+            var subRow = document.createElement("div");
+            subRow.className = "comment-row";
+            subRow.textContent = "원래 종목: " + ex.substitutedFrom;
+            detail.appendChild(subRow);
+          }
+
+          var detailActions = document.createElement("div");
+          detailActions.className = "routine-ex-detail-actions";
+
+          var goBtn = document.createElement("button");
+          goBtn.type = "button";
+          goBtn.className = "routine-ex-goto";
+          goBtn.textContent = status === "진행중" ? "지금 진행중" : "이 종목으로 이동";
+          if (status === "진행중") goBtn.disabled = true;
+          goBtn.addEventListener("click", function (event) {
+            event.stopPropagation();
+            goToRoutineExercise(pIdx, eIdx);
+          });
+          detailActions.appendChild(goBtn);
+
+          var deleteBtn = document.createElement("button");
+          deleteBtn.type = "button";
+          deleteBtn.className = "routine-ex-delete";
+          if (part.exercises.length <= 1) {
+            deleteBtn.disabled = true;
+            deleteBtn.textContent = "이 파트의 마지막 종목이라 삭제할 수 없어요";
+          } else {
+            deleteBtn.textContent = "이 종목 삭제";
+          }
+          deleteBtn.addEventListener("click", function (event) {
+            event.stopPropagation(); // 카드 자체의 클릭(종목 이동)으로 번지지 않게
+            if (deleteBtn.getAttribute("data-armed") === "true") {
+              deleteExercise(pIdx, eIdx);
+              return;
+            }
+            deleteBtn.setAttribute("data-armed", "true");
+            deleteBtn.textContent = "정말 삭제? 한 번 더";
+            setTimeout(function () {
+              if (deleteBtn.getAttribute("data-armed") === "true") {
+                deleteBtn.setAttribute("data-armed", "false");
+                deleteBtn.textContent = "이 종목 삭제";
+              }
+            }, 3000);
+          });
+          detailActions.appendChild(deleteBtn);
+          detail.appendChild(detailActions);
+
+          card.appendChild(detail);
+        }
+
+        card.addEventListener("click", function () {
+          state.routineExpandedId = state.routineExpandedId === ex.id ? null : ex.id;
+          renderRoutineOverlay();
+        });
+        card.addEventListener("keydown", function (event) {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            state.routineExpandedId = state.routineExpandedId === ex.id ? null : ex.id;
+            renderRoutineOverlay();
+          }
+        });
+
+        list.appendChild(card);
+      });
+
+      section.appendChild(list);
+
+      if (state.routineAddingPart === pIdx) {
+        section.appendChild(buildAddExerciseForm(pIdx));
+      } else {
+        var addBtn = document.createElement("button");
+        addBtn.type = "button";
+        addBtn.className = "routine-add-btn";
+        addBtn.textContent = "+ " + part.name + "에 종목 추가";
+        addBtn.addEventListener("click", function () {
+          state.routineAddingPart = pIdx;
+          renderRoutineOverlay();
+        });
+        section.appendChild(addBtn);
+      }
+
+      el.routineBody.appendChild(section);
+    });
+  }
+
+  function makeExerciseId(name) {
+    return "custom_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 6);
+  }
+
+  function addCustomExercise(partIdx, data) {
+    var part = state.session.parts[partIdx];
+    if (!part) return;
+    part.exercises.push({
+      id: makeExerciseId(data.name),
+      name: data.name,
+      isMain: false,
+      targetSets: data.targetSets,
+      targetReps: [data.repsMin, data.repsMax],
+      restSec: data.restSec,
+      sets: [],
+      comments: [],
+      substitutedFrom: null
+    });
+    state.routineAddingPart = null;
+    saveSession();
+    renderRoutineOverlay();
+    renderSession();
+  }
+
+  function deleteExercise(partIdx, exIdx) {
+    var part = state.session.parts[partIdx];
+    if (!part || part.exercises.length <= 1) return; // 파트는 최소 1종목 있어야 currentSessionExercise()가 안전
+
+    part.exercises.splice(exIdx, 1);
+
+    if (partIdx === state.session.currentPart) {
+      if (state.session.currentExercise > exIdx) {
+        state.session.currentExercise--;
+      } else if (state.session.currentExercise >= part.exercises.length) {
+        state.session.currentExercise = part.exercises.length - 1;
+      }
+      if (state.session.currentExercise === exIdx) {
+        // 지금 진행 중이던 종목이 삭제된 경우: 그 종목에 딸려 있던 배너/타이머 정리
+        state.session.pendingSubstitute = null;
+        state.sessionCondMessage = null;
+        state.sessionSubMessage = null;
+        state.editingSetKey = null;
+        stopRestCountdown();
+      }
+    }
+
+    state.routineExpandedId = null;
+    saveSession();
+    renderRoutineOverlay();
+    renderSession();
+  }
+
+  function buildAddExerciseForm(partIdx) {
+    var form = document.createElement("div");
+    form.className = "routine-add-form";
+
+    var nameInput = document.createElement("input");
+    nameInput.type = "text";
+    nameInput.className = "routine-add-form-name";
+    nameInput.placeholder = "종목 이름 (예: 인클라인 벤치프레스)";
+    form.appendChild(nameInput);
+
+    function numField(placeholder, value, small) {
+      var inp = document.createElement("input");
+      inp.type = "number";
+      inp.inputMode = "numeric";
+      inp.placeholder = placeholder;
+      inp.value = String(value);
+      if (small) inp.className = "routine-add-form-input-sm";
+      return inp;
+    }
+
+    var row = document.createElement("div");
+    row.className = "routine-add-form-row";
+    var setsInput = numField("세트", 3);
+    var repsMinInput = numField("반복(최소)", 8, true);
+    var repsMaxInput = numField("반복(최대)", 12, true);
+    var restInput = numField("휴식(초)", 90);
+    row.appendChild(setsInput);
+    row.appendChild(repsMinInput);
+    row.appendChild(repsMaxInput);
+    row.appendChild(restInput);
+    form.appendChild(row);
+
+    var actions = document.createElement("div");
+    actions.className = "routine-add-form-actions";
+
+    var saveBtn = document.createElement("button");
+    saveBtn.type = "button";
+    saveBtn.className = "routine-add-save";
+    saveBtn.textContent = "추가";
+    saveBtn.addEventListener("click", function () {
+      var name = nameInput.value.trim();
+      if (!name) { nameInput.focus(); return; }
+
+      var sets = parseInt(setsInput.value, 10);
+      if (isNaN(sets) || sets < 1) sets = 1;
+
+      var repsMin = parseInt(repsMinInput.value, 10);
+      if (isNaN(repsMin) || repsMin < 1) repsMin = 1;
+
+      var repsMax = parseInt(repsMaxInput.value, 10);
+      if (isNaN(repsMax) || repsMax < repsMin) repsMax = repsMin;
+
+      var rest = parseInt(restInput.value, 10);
+      if (isNaN(rest) || rest < 0) rest = 90;
+
+      addCustomExercise(partIdx, { name: name, targetSets: sets, repsMin: repsMin, repsMax: repsMax, restSec: rest });
+    });
+
+    var cancelBtn = document.createElement("button");
+    cancelBtn.type = "button";
+    cancelBtn.className = "routine-add-cancel";
+    cancelBtn.textContent = "취소";
+    cancelBtn.addEventListener("click", function () {
+      state.routineAddingPart = null;
+      renderRoutineOverlay();
+    });
+
+    actions.appendChild(saveBtn);
+    actions.appendChild(cancelBtn);
+    form.appendChild(actions);
+
+    requestAnimationFrame(function () { nameInput.focus(); });
+
+    return form;
+  }
+
+  function openRoutineOverlay(opts) {
+    state.routineOverlayOpen = true;
+    var focusExercise = opts && opts.focusExercise;
+    var focusPartIdx = opts && opts.focusPartIdx;
+    if (focusExercise) state.routineExpandedId = focusExercise;
+    renderRoutineOverlay();
+    el.routineOverlay.classList.add("show");
+    el.routineOverlay.setAttribute("aria-hidden", "false");
+
+    var scrollTarget = null;
+    if (focusExercise) {
+      scrollTarget = el.routineBody.querySelector('[data-ex-id="' + focusExercise + '"]');
+    } else if (focusPartIdx != null) {
+      scrollTarget = el.routineBody.querySelector('[data-part-index="' + focusPartIdx + '"]');
+    }
+    if (scrollTarget) {
+      el.routineBody.scrollTop = Math.max(0, scrollTarget.offsetTop - 8);
+    }
+  }
+
+  function closeRoutineOverlay() {
+    state.routineOverlayOpen = false;
+    state.routineAddingPart = null;
+    el.routineOverlay.classList.remove("show");
+    el.routineOverlay.setAttribute("aria-hidden", "true");
+  }
+
+  function goToRoutineExercise(partIdx, exIdx) {
+    if (partIdx !== state.session.currentPart || exIdx !== state.session.currentExercise) {
+      state.session.currentPart = partIdx;
+      state.session.currentExercise = exIdx;
+      state.session.pendingSubstitute = null;
+      state.sessionCondMessage = null;
+      state.sessionSubMessage = null;
+      state.editingSetKey = null;
+      stopRestCountdown();
+    }
+    closeRoutineOverlay();
+    saveSession();
+    renderSession();
+  }
+
+  function renderSetPlan(ex) {
+    el.sessionLog.textContent = "";
+    var restSec = ex.restSec || 90;
+    var totalRows = Math.max(ex.targetSets, ex.sets.length);
+
+    for (var i = 0; i < totalRows; i++) {
+      var doneSet = ex.sets[i];
+      var row = document.createElement("div");
+      row.className = "session-set";
+
+      var head = document.createElement("div");
+      head.className = "set-head";
+
+      var labelSuffix = "";
+      if (doneSet && i >= ex.targetSets) {
+        labelSuffix = " (보너스)";
+      } else if (!doneSet && i === ex.sets.length) {
+        labelSuffix = " (진행중)"; // 다음에 기록될, 지금 실제로 하고 있는 세트
+      } else if (!doneSet) {
+        labelSuffix = " (예정)";
+      }
+      var label = document.createElement("span");
+      label.className = "set-label";
+      label.textContent = (i + 1) + "세트" + labelSuffix + ":";
+      head.appendChild(label);
+
+      var fields = document.createElement("span");
+      fields.className = "set-fields";
+
+      var lastKnown = ex.sets[ex.sets.length - 1];
+      var weightInput = document.createElement("input");
+      weightInput.type = "number";
+      weightInput.inputMode = "decimal";
+      weightInput.step = tweaks.unit === "lb" ? "1" : "0.5";
+      weightInput.className = "set-num-input set-weight-input";
+      weightInput.setAttribute("data-set-key", String(i));
+      weightInput.placeholder = weightUnitLabel();
+      weightInput.value = doneSet ? displayWeight(doneSet.weight) : (lastKnown ? displayWeight(lastKnown.weight) : "");
+      fields.appendChild(weightInput);
+
+      var kgTimes = document.createElement("span");
+      kgTimes.className = "set-unit";
+      kgTimes.textContent = weightUnitLabel() + " ×";
+      fields.appendChild(kgTimes);
+
+      var repsInput = document.createElement("input");
+      repsInput.type = "number";
+      repsInput.inputMode = "numeric";
+      repsInput.step = "1";
+      repsInput.className = "set-num-input set-reps-input";
+      repsInput.setAttribute("data-set-key", String(i));
+      repsInput.placeholder = "회수";
+      repsInput.value = doneSet ? doneSet.reps : ex.targetReps[0];
+      fields.appendChild(repsInput);
+
+      var repsUnit = document.createElement("span");
+      repsUnit.className = "set-unit";
+      repsUnit.textContent = "회";
+      fields.appendChild(repsUnit);
+
+      var isLastLogged = doneSet && i === ex.sets.length - 1;
+      var checkBtn = document.createElement("button");
+      checkBtn.type = "button";
+      checkBtn.className = "set-check-btn";
+      checkBtn.setAttribute("data-set-key", String(i));
+      if (doneSet) {
+        checkBtn.setAttribute("data-done", "true");
+        checkBtn.textContent = "✓ 완료";
+        if (isLastLogged) {
+          checkBtn.setAttribute("data-action", "uncomplete");
+          checkBtn.title = "이 세트 완료 취소";
+        } else {
+          checkBtn.setAttribute("data-action", "locked");
+          checkBtn.setAttribute("data-locked", "true");
+          checkBtn.title = "먼저 뒤 세트를 취소해야 이 세트를 되돌릴 수 있어요";
+        }
+      } else {
+        checkBtn.setAttribute("data-done", "false");
+        checkBtn.setAttribute("data-action", "complete");
+        checkBtn.textContent = "완료 체크";
+        checkBtn.title = "지금 보이는 무게·반복수로 이 세트를 완료 처리";
+      }
+      fields.appendChild(checkBtn);
+
+      head.appendChild(fields);
+
+      if (doneSet) {
+        var memoBtn = document.createElement("button");
+        memoBtn.type = "button";
+        memoBtn.className = "set-memo-btn";
+        memoBtn.setAttribute("data-set-key", String(i));
+        memoBtn.textContent = doneSet.comment ? "메모 수정" : "메모 추가";
+        head.appendChild(memoBtn);
+      }
+      row.appendChild(head);
+
+      if (doneSet && state.editingSetKey === String(i)) {
+        var input = document.createElement("input");
+        input.type = "text";
+        input.className = "set-memo-input";
+        input.setAttribute("data-set-key", String(i));
+        input.placeholder = "이 세트 메모";
+        input.value = doneSet.comment || "";
+        row.appendChild(input);
+        (function (inputEl) {
+          requestAnimationFrame(function () {
+            inputEl.focus();
+            inputEl.setSelectionRange(inputEl.value.length, inputEl.value.length);
+          });
+        })(input);
+      } else if (doneSet && doneSet.comment) {
+        var cmt = document.createElement("div");
+        cmt.className = "set-memo-text";
+        cmt.textContent = doneSet.comment;
+        row.appendChild(cmt);
+      }
+
+      if (!doneSet) {
+        row.classList.add(i === ex.sets.length ? "session-set-next" : "session-set-future");
+      }
+
+      el.sessionLog.appendChild(row);
+
+      if (i < totalRows - 1) {
+        var restRow = document.createElement("div");
+        restRow.className = "session-rest-hint";
+        restRow.textContent = "쉬는시간 " + restSec + "초";
+        el.sessionLog.appendChild(restRow);
+      }
+    }
+
+    ex.comments.slice().reverse().forEach(function (c) {
+      var row = document.createElement("div");
+      row.className = "session-set comment";
+      row.textContent = c.text;
+      el.sessionLog.appendChild(row);
+    });
+  }
+
+  function findSetByKey(key) {
+    var ex = currentSessionExercise();
+    var idx = Number(key);
+    if (!ex.sets[idx]) return null;
+    return { ex: ex, set: ex.sets[idx] };
+  }
+
+  function readRowFieldValue(ex, idx, field) {
+    var selector = field === "weight" ? ".set-weight-input" : ".set-reps-input";
+    var input = el.sessionLog.querySelector(selector + '[data-set-key="' + idx + '"]');
+    if (input) {
+      var num = parseFloat(input.value);
+      if (!isNaN(num)) return field === "reps" ? Math.round(num) : toStoredKg(num);
+    }
+    if (field === "reps") return ex.targetReps[0];
+    var prev = ex.sets[ex.sets.length - 1];
+    return prev ? prev.weight : 0;
+  }
+
+  function ensureSetsUpTo(ex, idx) {
+    while (ex.sets.length < idx) {
+      var i = ex.sets.length;
+      ex.sets.push({
+        weight: readRowFieldValue(ex, i, "weight"),
+        reps: readRowFieldValue(ex, i, "reps"),
+        ts: new Date().toISOString()
+      });
+    }
+  }
+
+  function commitSetComment(input) {
+    var key = input.getAttribute("data-set-key");
+    var found = findSetByKey(key);
+    if (found) {
+      found.set.comment = input.value.trim();
+      saveSession();
+    }
+    state.editingSetKey = null;
+    renderSession();
+  }
+
+  function commitSetRowData(row) {
+    if (!row) return;
+    var weightInput = row.querySelector(".set-weight-input");
+    var repsInput = row.querySelector(".set-reps-input");
+    if (!weightInput || !repsInput) return;
+    var idx = Number(weightInput.getAttribute("data-set-key"));
+    var ex = currentSessionExercise();
+    var weightNum = parseFloat(weightInput.value);
+    var repsNum = parseFloat(repsInput.value);
+    ensureSetsUpTo(ex, idx);
+    var existing = ex.sets[idx] || { ts: new Date().toISOString() };
+    existing.weight = !isNaN(weightNum) ? toStoredKg(weightNum) : (existing.weight != null ? existing.weight : readRowFieldValue(ex, idx, "weight"));
+    existing.reps = !isNaN(repsNum) ? Math.round(repsNum) : (existing.reps != null ? existing.reps : readRowFieldValue(ex, idx, "reps"));
+    ex.sets[idx] = existing;
+    saveSession();
+  }
+
+  function commitSetRow(row) {
+    commitSetRowData(row);
+    renderSession();
+  }
+
+  // 클릭만으로 세트를 완료/취소하는 경로. 음성·텍스트 명령과 별개로,
+  // 화면에 보이는 무게·반복수 값 그대로 특정 세트를 콕 집어 완료 처리한다.
+  function handleSetCheckClick(btn) {
+    var action = btn.getAttribute("data-action");
+    if (action === "locked") return; // 중간 세트는 뒤 세트부터 순서대로 취소해야 함
+
+    var ex = currentSessionExercise();
+
+    if (action === "complete") {
+      var row = btn.closest(".session-set");
+      commitSetRowData(row);
+      startRestCountdown(ex.restSec || 90);
+      renderSession();
+      return;
+    }
+
+    if (action === "uncomplete") {
+      var idx = Number(btn.getAttribute("data-set-key"));
+      if (idx === ex.sets.length - 1) {
+        ex.sets.pop();
+        stopRestCountdown();
+        saveSession();
+        renderSession();
+      }
+    }
+  }
+
+  function startRestCountdown(restSec) {
+    clearInterval(state.restIntervalId);
+    state.restEndsAt = Date.now() + restSec * 1000;
+    renderRestTimer();
+    state.restIntervalId = setInterval(renderRestTimer, 1000);
+  }
+
+  function stopRestCountdown() {
+    clearInterval(state.restIntervalId);
+    state.restIntervalId = null;
+    state.restEndsAt = null;
+    if (el.sessionRestTimer) {
+      el.sessionRestTimer.classList.remove("show", "done");
+      el.sessionRestTimer.textContent = "";
+    }
+  }
+
+  function renderRestTimer() {
+    if (!el.sessionRestTimer) return;
+    if (!state.restEndsAt) {
+      el.sessionRestTimer.classList.remove("show", "done");
+      return;
+    }
+    var remaining = Math.round((state.restEndsAt - Date.now()) / 1000);
+    if (remaining <= 0) {
+      el.sessionRestTimer.textContent = restDoneText();
+      el.sessionRestTimer.classList.add("show", "done");
+      clearInterval(state.restIntervalId);
+      state.restIntervalId = null;
+      setTimeout(function () {
+        state.restEndsAt = null;
+        if (el.sessionRestTimer) el.sessionRestTimer.classList.remove("show", "done");
+      }, 4000);
+      return;
+    }
+    el.sessionRestTimer.classList.remove("done");
+    el.sessionRestTimer.classList.add("show");
+    el.sessionRestTimer.textContent = restCountdownText(remaining);
+  }
+
   function renderSessionSummaryExport() {
     var lines = [];
     lines.push("LiftVoice 세션 요약 — " + new Date().toISOString().slice(0, 10));
@@ -1303,7 +2842,7 @@
         var label = ex.name + (ex.substitutedFrom ? " (원래 종목: " + ex.substitutedFrom + ")" : "");
         lines.push(label + ":");
         ex.sets.forEach(function (s, i) {
-          lines.push("  " + (i + 1) + "세트 " + s.weight + "kg x " + s.reps + "회");
+          lines.push("  " + (i + 1) + "세트 " + displayWeight(s.weight) + weightUnitLabel() + " x " + s.reps + "회");
         });
         ex.comments.forEach(function (c) {
           lines.push("  메모: " + c.text);
@@ -1399,6 +2938,8 @@
     state.session.pendingSubstitute = null;
     state.sessionCondMessage = null;
     state.sessionSubMessage = null;
+    state.editingSetKey = null;
+    stopRestCountdown();
     saveSession();
     renderSession();
   }
@@ -1412,7 +2953,7 @@
     var sub = SESSION_SUBSTITUTES[ex.id];
     if (!sub) {
       state.session.pendingSubstitute = null;
-      state.sessionSubMessage = "이 종목은 등록된 대체 후보가 없어요. 직접 판단해서 진행하세요.";
+      state.sessionSubMessage = toneCopy("noSub");
       return;
     }
     // DOM이 아니라 state에 담아 renderSession()이 매번 다시 그리게 한다.
@@ -1424,6 +2965,8 @@
     var ex = currentSessionExercise();
     var sub = SESSION_SUBSTITUTES[ex.id];
     state.session.pendingSubstitute = null;
+    state.editingSetKey = null;
+    stopRestCountdown();
     if (!sub) {
       saveSession();
       renderSession();
@@ -1455,11 +2998,18 @@
         break;
       }
       case "COMMENT":
-        ex.comments.push({ text: cmd.text, ts: new Date().toISOString() });
+        if (ex.sets.length) {
+          var lastLoggedSet = ex.sets[ex.sets.length - 1];
+          lastLoggedSet.comment = lastLoggedSet.comment
+            ? lastLoggedSet.comment + " / " + cmd.text
+            : cmd.text;
+        } else {
+          ex.comments.push({ text: cmd.text, ts: new Date().toISOString() });
+        }
         break;
       case "CONDITION":
         ex.comments.push({ text: "[컨디션] " + cmd.text, ts: new Date().toISOString() });
-        state.sessionCondMessage = "기록했어요. 무리하지 마세요.";
+        state.sessionCondMessage = toneCopy("condition");
         break;
       case "SUBSTITUTE_REQUEST":
         showSubstituteSuggestion(ex);
@@ -1474,6 +3024,24 @@
       case "NEXT_EXERCISE":
         advanceSessionExercise();
         return; // advanceSessionExercise가 자체적으로 save/render 처리
+      case "ROUTINE_OVERVIEW":
+        openRoutineOverlay();
+        return;
+      case "PART_REMAINING": {
+        var partMatch = resolvePartQuery(cmd.partQuery);
+        openRoutineOverlay(partMatch ? { focusPartIdx: partMatch.idx } : null);
+        return;
+      }
+      case "EXERCISE_QUERY": {
+        var exMatch = resolveExerciseQuery(cmd.nameQuery);
+        if (exMatch) {
+          openRoutineOverlay({ focusExercise: exMatch.ex.id });
+        } else {
+          state.sessionSubMessage = "'" + cmd.nameQuery + "' 종목을 찾지 못했어요.";
+          renderSession();
+        }
+        return;
+      }
       case "SESSION_END":
         renderSessionSummaryExport();
         return;
@@ -1485,6 +3053,7 @@
         }
         if (weight == null) return; // 첫 세트에서 무게를 안 말하면 조용히 무시
         ex.sets.push({ weight: weight, reps: cmd.reps, ts: new Date().toISOString() });
+        startRestCountdown(ex.restSec || 90);
         break;
       }
       default:
@@ -1511,6 +3080,22 @@
     save();
     renderLog();
     renderStats();
+  }
+
+  // 음성 인식 결과와 텍스트 직접 입력이 완전히 같은 경로를 타게 하는 공용 처리기.
+  // 마이크 없이(또는 인식이 안 될 때) 같은 명령을 텍스트로 쳐도 동일하게 동작한다.
+  function processFinalText(rawText) {
+    var finalText = rawText.trim();
+    if (!finalText) return;
+    renderTranscript(finalText, "");
+    if (state.mode === "script") {
+      handleScriptResult(finalText);
+    } else if (state.mode === "session") {
+      addEntry(finalText);
+      handleSessionCommand(finalText);
+    } else {
+      addEntry(finalText);
+    }
   }
 
   /* ---------- engine ---------- */
@@ -1540,15 +3125,7 @@
         }
       }
       if (finalText) {
-        renderTranscript(finalText.trim(), "");
-        if (state.mode === "script") {
-          handleScriptResult(finalText.trim());
-        } else if (state.mode === "session") {
-          addEntry(finalText);
-          handleSessionCommand(finalText.trim());
-        } else {
-          addEntry(finalText);
-        }
+        processFinalText(finalText);
       } else {
         renderTranscript("", interimText);
       }
@@ -1675,10 +3252,25 @@
 
   el.rec.addEventListener("click", toggle);
 
+  function submitTypedCommand() {
+    var text = el.typeInput.value;
+    processFinalText(text);
+    el.typeInput.value = "";
+  }
+  el.btnTypeSend.addEventListener("click", submitTypedCommand);
+  el.typeInput.addEventListener("keydown", function (event) {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      submitTypedCommand();
+    }
+  });
+
   el.modes.addEventListener("click", function (event) {
     var btn = event.target.closest(".chip");
     if (!btn) return;
     state.mode = btn.getAttribute("data-m");
+    if (state.mode !== "session") stopRestCountdown();
+    applyTweaks();
     Array.prototype.forEach.call(el.modes.querySelectorAll(".chip"), function (c) {
       c.setAttribute("aria-pressed", c === btn ? "true" : "false");
     });
@@ -1705,6 +3297,76 @@
     state.sessionSubMessage = null;
     saveSession();
     renderSession();
+  });
+
+  el.btnRoutineOverview.addEventListener("click", function () {
+    openRoutineOverlay();
+  });
+
+  el.sessionRestInput.addEventListener("change", function () {
+    var ex = currentSessionExercise();
+    var val = parseInt(el.sessionRestInput.value, 10);
+    if (!isNaN(val) && val >= 0) {
+      ex.restSec = val;
+      saveSession();
+    }
+    renderSession();
+  });
+
+  el.btnRoutineClose.addEventListener("click", closeRoutineOverlay);
+  el.routineBackdrop.addEventListener("click", closeRoutineOverlay);
+
+  function openHelpOverlay() {
+    el.helpOverlay.classList.add("show");
+    el.helpOverlay.setAttribute("aria-hidden", "false");
+  }
+  function closeHelpOverlay() {
+    el.helpOverlay.classList.remove("show");
+    el.helpOverlay.setAttribute("aria-hidden", "true");
+  }
+  el.btnHelpOpen.addEventListener("click", openHelpOverlay);
+  el.btnHelpClose.addEventListener("click", closeHelpOverlay);
+  el.helpBackdrop.addEventListener("click", closeHelpOverlay);
+
+  document.addEventListener("keydown", function (event) {
+    if (event.key !== "Escape") return;
+    if (state.routineOverlayOpen) closeRoutineOverlay();
+    if (el.helpOverlay.classList.contains("show")) closeHelpOverlay();
+  });
+
+  el.sessionLog.addEventListener("click", function (event) {
+    var checkBtn = event.target.closest(".set-check-btn");
+    if (checkBtn) {
+      handleSetCheckClick(checkBtn);
+      return;
+    }
+    var memoBtn = event.target.closest(".set-memo-btn");
+    if (!memoBtn) return;
+    commitSetRowData(memoBtn.closest(".session-set"));
+    var key = memoBtn.getAttribute("data-set-key");
+    state.editingSetKey = state.editingSetKey === key ? null : key;
+    renderSession();
+  });
+
+  el.sessionLog.addEventListener("focusout", function (event) {
+    var memoInput = event.target.closest(".set-memo-input");
+    var weightInput = event.target.closest(".set-weight-input");
+    var repsInput = event.target.closest(".set-reps-input");
+    var input = memoInput || weightInput || repsInput;
+    if (!input) return;
+    var row = input.closest(".session-set");
+    var next = event.relatedTarget;
+    if (row && next && row.contains(next)) return; // focus moved within the same row - keep editing
+    if (memoInput) { commitSetComment(memoInput); return; }
+    commitSetRow(row);
+  });
+
+  el.sessionLog.addEventListener("keydown", function (event) {
+    var input = event.target.closest(".set-memo-input, .set-weight-input, .set-reps-input");
+    if (input && event.key === "Enter") {
+      event.preventDefault();
+      input.blur();
+    }
   });
 
   // Backgrounding the page tears down the audio session; stop cleanly
@@ -1787,10 +3449,54 @@
 
   state.session = loadSession();
   load();
+  loadTweaks();
+  applyTweaks();
+  syncTweaksUI();
   renderLog();
   renderStats();
   renderScript();
   renderSession();
+
+  document.getElementById("tweaks-toggle").addEventListener("click", function () {
+    document.getElementById("tweaks-panel").classList.add("show");
+    document.getElementById("tweaks-panel").setAttribute("aria-hidden", "false");
+    this.style.display = "none";
+  });
+  document.getElementById("tweaks-close").addEventListener("click", function () {
+    document.getElementById("tweaks-panel").classList.remove("show");
+    document.getElementById("tweaks-panel").setAttribute("aria-hidden", "true");
+    document.getElementById("tweaks-toggle").style.display = "";
+  });
+  document.getElementById("tweaks-vibe").addEventListener("click", function (event) {
+    var btn = event.target.closest(".tweaks-opt");
+    if (!btn) return;
+    tweaks.vibe = btn.getAttribute("data-vibe-opt");
+    saveTweaks();
+    applyTweaks();
+    syncTweaksUI();
+  });
+  document.getElementById("tweaks-tone").addEventListener("click", function (event) {
+    var btn = event.target.closest(".tweaks-opt");
+    if (!btn) return;
+    tweaks.tone = btn.getAttribute("data-tone-opt");
+    saveTweaks();
+    applyTweaks();
+    syncTweaksUI();
+  });
+  document.getElementById("tweaks-unit").addEventListener("click", function (event) {
+    var btn = event.target.closest(".tweaks-opt");
+    if (!btn) return;
+    tweaks.unit = btn.getAttribute("data-unit-opt");
+    saveTweaks();
+    syncTweaksUI();
+    renderSession();
+  });
+  document.getElementById("tweaks-focus").addEventListener("click", function () {
+    tweaks.focus = !tweaks.focus;
+    saveTweaks();
+    applyTweaks();
+    syncTweaksUI();
+  });
 
   // Android WebView exposes SpeechRecognition but never fires its events,
   // so this must be checked before the constructor test below.
