@@ -525,6 +525,16 @@
     align-items: center;
     gap: 8px;
   }
+  .session-elapsed {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    color: var(--muted);
+  }
+  .session-end-btn {
+    margin-top: 12px;
+    width: 100%;
+    border-color: var(--hot);
+  }
 
   /* ---- routine overlay ---- */
   .routine-overlay {
@@ -1142,6 +1152,7 @@
     <div class="script-meta">
       <span id="session-part-name">어깨</span>
       <span class="session-meta-right">
+        <span class="session-elapsed" id="session-elapsed"></span>
         <span id="session-progress">1 / 3 종목</span>
         <button class="skip" type="button" id="btn-help-open">명령어</button>
         <button class="skip" type="button" id="btn-routine-overview">전체 루틴</button>
@@ -1150,6 +1161,11 @@
     <div class="script-line" id="session-exercise-name">오버헤드프레스</div>
     <div class="session-target" id="session-target">목표 4세트 × 6~8회 · 0/4</div>
     <div class="session-next-set" id="session-next-set"></div>
+    <div class="session-rest-setting">
+      <span>목표 세트 수</span>
+      <input type="number" class="set-num-input" id="session-target-sets-input" min="1" step="1" inputmode="numeric">
+      <span>세트</span>
+    </div>
     <div class="session-rest-setting">
       <span>세트당 휴식</span>
       <input type="number" class="set-num-input" id="session-rest-input" min="0" step="5" inputmode="numeric">
@@ -1163,6 +1179,7 @@
       <button class="vbtn" type="button" id="btn-sub-dismiss">그냥 이대로</button>
     </div>
     <div class="banner" id="session-cond-banner"></div>
+    <button class="tbtn danger session-end-btn" type="button" id="btn-session-end">운동 종료</button>
   </div>
 
   <div class="banner" id="banner"></div>
@@ -1420,6 +1437,15 @@
   function toStoredKg(displayVal) { return tweaks.unit === "lb" ? lbToKgVal(displayVal) : displayVal; }
   function weightUnitLabel() { return tweaks.unit === "lb" ? "lb" : "kg"; }
 
+  function formatDuration(ms) {
+    var totalSec = Math.max(0, Math.floor(ms / 1000));
+    var h = Math.floor(totalSec / 3600);
+    var m = Math.floor((totalSec % 3600) / 60);
+    var s = totalSec % 60;
+    function pad(n) { return n < 10 ? "0" + n : String(n); }
+    return h > 0 ? (h + ":" + pad(m) + ":" + pad(s)) : (pad(m) + ":" + pad(s));
+  }
+
   function loadTweaks() {
     try {
       var raw = localStorage.getItem(STORE_TWEAKS);
@@ -1484,6 +1510,8 @@
       currentPart: 0,
       currentExercise: 0,
       pendingSubstitute: null,
+      startedAt: null, // 첫 세트 기록 시점(ms epoch) — 이때 운동 시간 측정 시작
+      endedAt: null,   // "운동 종료" 누른 시점(ms epoch)
       parts: SESSION_ROUTINE.map(function (part) {
         return {
           name: part.name,
@@ -1527,6 +1555,8 @@
           parsed.currentPart = pi;
           parsed.currentExercise = ei;
           if (!parsed.pendingSubstitute) parsed.pendingSubstitute = null;
+          if (typeof parsed.startedAt !== "number") parsed.startedAt = null;
+          if (typeof parsed.endedAt !== "number") parsed.endedAt = null;
           return parsed;
         }
       }
@@ -1901,7 +1931,10 @@
     sessionExerciseName: document.getElementById("session-exercise-name"),
     sessionTarget: document.getElementById("session-target"),
     sessionNextSet: document.getElementById("session-next-set"),
+    sessionElapsed: document.getElementById("session-elapsed"),
+    sessionTargetSetsInput: document.getElementById("session-target-sets-input"),
     sessionRestInput: document.getElementById("session-rest-input"),
+    btnSessionEnd: document.getElementById("btn-session-end"),
     sessionRestTimer: document.getElementById("session-rest-timer"),
     sessionLog: document.getElementById("session-log"),
     sessionSubBanner: document.getElementById("session-sub-banner"),
@@ -1941,7 +1974,8 @@
     routineAddingPart: null,   // 종목 추가 폼이 열려 있는 파트 인덱스(비영속)
     editingSetKey: null,       // 메모 입력 중인 세트 인덱스(문자열, 비영속)
     restEndsAt: null,          // 휴식 타이머 종료 시각(ms epoch, 비영속)
-    restIntervalId: null       // 휴식 타이머 setInterval id
+    restIntervalId: null,      // 휴식 타이머 setInterval id
+    elapsedIntervalId: null    // 총 운동 시간 갱신 setInterval id (비영속)
   };
 
   var rec = null;
@@ -2158,7 +2192,11 @@
     if (el.sessionRestInput && document.activeElement !== el.sessionRestInput) {
       el.sessionRestInput.value = ex.restSec || 90;
     }
+    if (el.sessionTargetSetsInput && document.activeElement !== el.sessionTargetSetsInput) {
+      el.sessionTargetSetsInput.value = ex.targetSets;
+    }
 
+    renderElapsed();
     renderRestTimer();
     renderSetPlan(ex);
 
@@ -2895,6 +2933,7 @@
 
     if (action === "complete") {
       var row = btn.closest(".session-set");
+      markSessionStarted();
       commitSetRowData(row);
       startRestCountdown(ex.restSec || 90);
       renderSession();
@@ -2952,25 +2991,89 @@
     el.sessionRestTimer.textContent = restCountdownText(remaining);
   }
 
+  // 첫 세트를 기록하는 순간 운동 시작 시각을 못박는다. 이미 시작돼 있으면 아무 것도 안 함.
+  function markSessionStarted() {
+    if (!state.session.startedAt) {
+      state.session.startedAt = Date.now();
+      startElapsedTicker();
+    }
+  }
+
+  function startElapsedTicker() {
+    clearInterval(state.elapsedIntervalId);
+    renderElapsed();
+    state.elapsedIntervalId = setInterval(renderElapsed, 1000);
+  }
+
+  function stopElapsedTicker() {
+    clearInterval(state.elapsedIntervalId);
+    state.elapsedIntervalId = null;
+  }
+
+  function renderElapsed() {
+    if (!el.sessionElapsed) return;
+    if (!state.session.startedAt) {
+      el.sessionElapsed.textContent = "";
+      return;
+    }
+    var end = state.session.endedAt || Date.now();
+    el.sessionElapsed.textContent = "⏱ " + formatDuration(end - state.session.startedAt);
+  }
+
+  // 운동 종료 버튼과 음성/텍스트 "오늘 끝" 명령이 공유하는 단일 종료 경로.
+  function endWorkoutSession() {
+    if (!state.session.startedAt) {
+      state.sessionSubMessage = "아직 기록된 세트가 없어서 종료할 게 없어요.";
+      renderSession();
+      return;
+    }
+    state.session.endedAt = Date.now();
+    stopElapsedTicker();
+    renderElapsed();
+    saveSession();
+    renderSessionSummaryExport();
+  }
+
   function renderSessionSummaryExport() {
     var lines = [];
-    lines.push("LiftVoice 세션 요약 — " + new Date().toISOString().slice(0, 10));
+    var dateLabel = new Date().toISOString().slice(0, 10);
+    lines.push("LiftVoice 세션 요약 — " + dateLabel);
+
+    if (state.session.startedAt) {
+      var end = state.session.endedAt || Date.now();
+      lines.push("총 운동 시간: " + formatDuration(end - state.session.startedAt));
+    }
     lines.push("");
+
+    var totalSets = 0;
+    var touchedExercises = 0;
+
     state.session.parts.forEach(function (part) {
-      lines.push("=== " + part.name + " ===");
+      var partLines = [];
       part.exercises.forEach(function (ex) {
         if (!ex.sets.length && !ex.comments.length) return;
+        touchedExercises++;
         var label = ex.name + (ex.substitutedFrom ? " (원래 종목: " + ex.substitutedFrom + ")" : "");
-        lines.push(label + ":");
+        partLines.push(label + " — " + ex.sets.length + "/" + ex.targetSets + "세트");
         ex.sets.forEach(function (s, i) {
-          lines.push("  " + (i + 1) + "세트 " + displayWeight(s.weight) + weightUnitLabel() + " x " + s.reps + "회");
+          totalSets++;
+          var setLine = "  " + (i + 1) + "세트 " + displayWeight(s.weight) + weightUnitLabel() + " x " + s.reps + "회";
+          if (s.comment) setLine += "  (" + s.comment + ")";
+          partLines.push(setLine);
         });
         ex.comments.forEach(function (c) {
-          lines.push("  메모: " + c.text);
+          partLines.push("  메모: " + c.text);
         });
       });
+      if (!partLines.length) return; // 손도 안 댄 파트는 요약에서 생략
+      lines.push("=== " + part.name + " ===");
+      lines.push.apply(lines, partLines);
       lines.push("");
     });
+
+    lines.push("--- 요약 ---");
+    lines.push("완료 종목: " + touchedExercises + "개 · 완료 세트: " + totalSets + "개");
+
     var text = lines.join("\n");
     el.exportBox.textContent = text;
     el.exportBox.classList.add("show");
@@ -3164,7 +3267,7 @@
         return;
       }
       case "SESSION_END":
-        renderSessionSummaryExport();
+        endWorkoutSession();
         return;
       case "SET_LOG": {
         var weight = cmd.weightKg;
@@ -3173,6 +3276,7 @@
           weight = prevSet ? prevSet.weight : null;
         }
         if (weight == null) return; // 첫 세트에서 무게를 안 말하면 조용히 무시
+        markSessionStarted();
         ex.sets.push({ weight: weight, reps: cmd.reps, ts: new Date().toISOString() });
         startRestCountdown(ex.restSec || 90);
         break;
@@ -3434,6 +3538,18 @@
     renderSession();
   });
 
+  el.sessionTargetSetsInput.addEventListener("change", function () {
+    var ex = currentSessionExercise();
+    var val = parseInt(el.sessionTargetSetsInput.value, 10);
+    if (!isNaN(val) && val >= 1) {
+      ex.targetSets = val;
+      saveSession();
+    }
+    renderSession();
+  });
+
+  el.btnSessionEnd.addEventListener("click", endWorkoutSession);
+
   el.btnRoutineClose.addEventListener("click", closeRoutineOverlay);
   el.routineBackdrop.addEventListener("click", closeRoutineOverlay);
 
@@ -3577,6 +3693,7 @@
   renderStats();
   renderScript();
   renderSession();
+  if (state.session.startedAt && !state.session.endedAt) startElapsedTicker();
 
   document.getElementById("tweaks-toggle").addEventListener("click", function () {
     document.getElementById("tweaks-panel").classList.add("show");
