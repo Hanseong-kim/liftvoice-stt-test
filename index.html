@@ -737,15 +737,39 @@
     gap: 4px;
   }
   .routine-ex[data-status="진행중"] { border-color: var(--accent); }
+  .routine-ex.dragging-ghost {
+    opacity: 0.35;
+    border-style: dashed;
+  }
   .routine-ex-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 8px;
   }
+  .routine-ex-handle {
+    touch-action: none;
+    cursor: grab;
+    padding: 4px 6px;
+    margin: -4px -6px -4px 0;
+    font-size: 16px;
+    line-height: 1;
+    color: var(--muted);
+    flex: none;
+  }
   .routine-ex-name {
     font-size: 15px;
     font-weight: 600;
+    flex: 1;
+    min-width: 0;
+  }
+  .routine-ex-drag-floater {
+    position: fixed;
+    z-index: 80;
+    pointer-events: none;
+    box-shadow: 0 14px 34px rgba(0, 0, 0, 0.28);
+    opacity: 0.96;
+    margin: 0;
   }
   .routine-ex-status {
     font-family: var(--font-mono);
@@ -2234,6 +2258,13 @@
         var row = document.createElement("div");
         row.className = "routine-ex-row";
 
+        var handle = document.createElement("span");
+        handle.className = "routine-ex-handle";
+        handle.textContent = "⠿";
+        handle.title = "드래그해서 순서 변경";
+        handle.setAttribute("aria-hidden", "true");
+        row.appendChild(handle);
+
         var nameEl = document.createElement("span");
         nameEl.className = "routine-ex-name";
         nameEl.textContent = ex.name;
@@ -2246,6 +2277,8 @@
         row.appendChild(statusEl);
 
         card.appendChild(row);
+
+        attachExerciseDrag(handle, card, pIdx, list);
 
         var repsLabel = ex.targetReps[0] === ex.targetReps[1]
           ? String(ex.targetReps[0])
@@ -2391,6 +2424,93 @@
 
       el.routineBody.appendChild(section);
     });
+  }
+
+  var exerciseDragActive = false;
+
+  // 핸들을 눌러서 시작하는 드래그 정렬. 카드 자체를 "고스트"(반투명 자리표시자)로
+  // 남겨 list 안에서 실시간으로 이동시키고, 화면에는 커서를 따라다니는 별도
+  // 뜬 사본(floater)만 보여준다. 손을 떼면 그 시점의 DOM 순서를 실제 데이터에 반영한다.
+  function attachExerciseDrag(handle, card, pIdx, list) {
+    handle.addEventListener("click", function (event) {
+      event.stopPropagation(); // 핸들 탭이 카드 펼치기로 번지지 않게
+    });
+
+    handle.addEventListener("pointerdown", function (event) {
+      if (event.pointerType === "mouse" && event.button !== 0) return;
+      if (exerciseDragActive) return;
+      event.preventDefault();
+      event.stopPropagation();
+      startExerciseDrag(event, card, pIdx, list);
+    });
+  }
+
+  function startExerciseDrag(startEvent, card, pIdx, list) {
+    exerciseDragActive = true;
+    var part = state.session.parts[pIdx];
+    var rect = card.getBoundingClientRect();
+    var offsetX = startEvent.clientX - rect.left;
+    var offsetY = startEvent.clientY - rect.top;
+
+    var floater = card.cloneNode(true);
+    floater.className = "routine-ex routine-ex-drag-floater";
+    floater.style.width = rect.width + "px";
+    floater.style.left = rect.left + "px";
+    floater.style.top = rect.top + "px";
+    document.body.appendChild(floater);
+
+    card.classList.add("dragging-ghost");
+    document.body.style.userSelect = "none";
+
+    function onMove(event) {
+      floater.style.left = (event.clientX - offsetX) + "px";
+      floater.style.top = (event.clientY - offsetY) + "px";
+
+      var pointerY = event.clientY;
+      var siblings = Array.prototype.slice.call(list.children).filter(function (n) { return n !== card; });
+      var target = null;
+      var insertBefore = true;
+      for (var i = 0; i < siblings.length; i++) {
+        var r = siblings[i].getBoundingClientRect();
+        var mid = r.top + r.height / 2;
+        if (pointerY < mid) { target = siblings[i]; insertBefore = true; break; }
+      }
+      if (!target && siblings.length) { target = siblings[siblings.length - 1]; insertBefore = false; }
+
+      if (target) {
+        if (insertBefore) list.insertBefore(card, target);
+        else list.insertBefore(card, target.nextSibling);
+      }
+    }
+
+    function onUp() {
+      document.removeEventListener("pointermove", onMove);
+      document.removeEventListener("pointerup", onUp);
+      document.body.removeChild(floater);
+      card.classList.remove("dragging-ghost");
+      document.body.style.userSelect = "";
+      exerciseDragActive = false;
+
+      var newOrderIds = Array.prototype.map.call(list.children, function (n) { return n.getAttribute("data-ex-id"); });
+      var byId = {};
+      part.exercises.forEach(function (ex) { byId[ex.id] = ex; });
+      var reordered = newOrderIds.map(function (id) { return byId[id]; }).filter(Boolean);
+
+      if (reordered.length === part.exercises.length) {
+        var currentId = (pIdx === state.session.currentPart) ? part.exercises[state.session.currentExercise].id : null;
+        part.exercises = reordered;
+        if (currentId) {
+          var newIdx = part.exercises.findIndex(function (ex) { return ex.id === currentId; });
+          if (newIdx !== -1) state.session.currentExercise = newIdx;
+        }
+        saveSession();
+      }
+      renderRoutineOverlay();
+      renderSession();
+    }
+
+    document.addEventListener("pointermove", onMove);
+    document.addEventListener("pointerup", onUp, { once: true });
   }
 
   function makeExerciseId(name) {
