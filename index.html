@@ -1675,6 +1675,7 @@
     s = stripPunctuation(s);
     s = s.replace(/kg|킬로그램|킬로|키로/g, "키로");
     s = s.replace(/lbs|lb|파운드/g, "파운드");
+    s = s.replace(/초간|초동안/g, "초");
     var words = s.split(/\s+/).filter(function (w) { return w.length > 0; });
     var out = words.map(function (w) {
       var m = w.match(/^(.+?)(개|회|번|초|키로|파운드)$/);
