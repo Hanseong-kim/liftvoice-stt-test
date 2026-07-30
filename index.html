@@ -562,6 +562,18 @@
     background: none;
     color: var(--hot);
   }
+  .session-reset-btn {
+    font: inherit;
+    font-size: 12px;
+    padding: 6px 10px;
+    min-height: 34px;
+    border-radius: 8px;
+    border: 1px solid var(--line);
+    background: none;
+    color: var(--muted);
+    cursor: pointer;
+    flex: none;
+  }
 
   /* ---- routine overlay ---- */
   .routine-overlay {
@@ -819,6 +831,7 @@
   }
   .routine-ex-status[data-status="완료"] { background: color-mix(in srgb, var(--good) 20%, transparent); color: var(--good); }
   .routine-ex-status[data-status="진행중"] { background: color-mix(in srgb, var(--accent) 20%, transparent); color: var(--accent); }
+  .routine-ex-status[data-status="일부 완료"] { background: color-mix(in srgb, var(--warn) 20%, transparent); color: var(--warn); }
   .routine-ex-status[data-status="예정"] { background: var(--surface); color: var(--muted); border: 1px solid var(--line); }
   .routine-ex-sub {
     font-size: 12px;
@@ -1180,6 +1193,7 @@
       <button class="session-start-btn" type="button" id="btn-session-start">▶ 운동 시작</button>
       <button class="session-end-btn" type="button" id="btn-session-end">■ 운동 종료</button>
       <span class="session-elapsed" id="session-elapsed"></span>
+      <button class="session-reset-btn" type="button" id="btn-session-reset" title="운동 시간만 0으로 초기화 (기록된 세트는 그대로)">⟲ 시간 초기화</button>
     </div>
     <div class="script-meta">
       <span id="session-part-name">어깨</span>
@@ -1973,6 +1987,7 @@
     sessionRestInput: document.getElementById("session-rest-input"),
     btnSessionStart: document.getElementById("btn-session-start"),
     btnSessionEnd: document.getElementById("btn-session-end"),
+    btnSessionReset: document.getElementById("btn-session-reset"),
     sessionRestTimer: document.getElementById("session-rest-timer"),
     sessionLog: document.getElementById("session-log"),
     sessionSubBanner: document.getElementById("session-sub-banner"),
@@ -2267,12 +2282,16 @@
     }
   }
 
+  // "진행중"은 오직 지금 실제로 열려있는(currentPart/currentExercise) 종목만을 뜻한다.
+  // 세트를 일부만 하고 다른 종목으로 넘어간 경우는 "일부 완료"로 따로 구분한다 —
+  // 예전엔 둘 다 "진행중"으로 겹쳐서, 상세 패널의 "이동" 버튼이 (currentExercise가
+  // 아닌데도) 비활성화되는 바람에 그 종목으로 돌아갈 수 없는 버그가 있었다.
   function computeExerciseStatus(partIdx, exIdx, ex) {
     if (partIdx === state.session.currentPart && exIdx === state.session.currentExercise) {
       return "진행중";
     }
     if (ex.targetSets > 0 && ex.sets.length >= ex.targetSets) return "완료";
-    if (ex.sets.length > 0) return "진행중";
+    if (ex.sets.length > 0) return "일부 완료";
     return "예정";
   }
 
@@ -3118,6 +3137,16 @@
     renderSessionSummaryExport();
   }
 
+  // 시간만 0으로 되돌린다 — 기록된 세트·메모는 전혀 건드리지 않는다.
+  // 실수로 너무 일찍 시작했거나 시간 측정을 다시 하고 싶을 때 쓴다.
+  function resetWorkoutTimer() {
+    state.session.startedAt = null;
+    state.session.endedAt = null;
+    stopElapsedTicker();
+    saveSession();
+    renderSession();
+  }
+
   // 세트 메모·종목 메모·아직 완료 안 한 세트에 예약된 메모까지 전부 모아서,
   // 각 줄이 어떤 파트/종목/세트인지 스스로 밝히는 태그를 붙인다.
   // 나중에 이 줄 하나만 메모장에 따로 붙여넣어도 무슨 내용인지 알 수 있게 하기 위함.
@@ -3674,6 +3703,7 @@
     renderSession();
   });
   el.btnSessionEnd.addEventListener("click", endWorkoutSession);
+  el.btnSessionReset.addEventListener("click", resetWorkoutTimer);
 
   el.btnRoutineClose.addEventListener("click", closeRoutineOverlay);
   el.routineBackdrop.addEventListener("click", closeRoutineOverlay);
