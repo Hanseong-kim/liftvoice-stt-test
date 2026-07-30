@@ -257,6 +257,26 @@
   .script-actions.show { display: flex; }
   .script-actions .vbtn { flex: 1; }
 
+  .session-target {
+    font-size: 14px;
+    color: var(--muted);
+  }
+  .session-log {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .session-set {
+    background: var(--surface-2);
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 14px;
+  }
+  .session-set.comment {
+    color: var(--muted);
+    font-size: 12px;
+  }
+
   /* ---- live panel ---- */
   .live {
     background: var(--surface);
@@ -518,6 +538,7 @@
   <div class="chips" id="modes">
     <button class="chip" type="button" data-m="free" aria-pressed="true">자유 발화</button>
     <button class="chip" type="button" data-m="script" aria-pressed="false">스크립트 측정</button>
+    <button class="chip" type="button" data-m="session" aria-pressed="false">실전 세션</button>
   </div>
 
   <div class="script-panel" id="script-panel">
@@ -531,6 +552,22 @@
       <button class="vbtn no" type="button" id="btn-misheard">오인식</button>
       <button class="vbtn" type="button" id="btn-misread">내가 잘못 읽음</button>
     </div>
+  </div>
+
+  <div class="script-panel" id="session-panel">
+    <div class="script-meta">
+      <span id="session-part-name">어깨</span>
+      <span id="session-progress">1 / 3 종목</span>
+    </div>
+    <div class="script-line" id="session-exercise-name">오버헤드프레스</div>
+    <div class="session-target" id="session-target">목표 4세트 × 6~8회 · 0/4</div>
+    <div class="session-log" id="session-log"></div>
+    <div class="banner" id="session-sub-banner"></div>
+    <div class="script-actions" id="session-sub-actions">
+      <button class="vbtn ok" type="button" id="btn-sub-apply">대체 적용</button>
+      <button class="vbtn" type="button" id="btn-sub-dismiss">그냥 이대로</button>
+    </div>
+    <div class="banner" id="session-cond-banner"></div>
   </div>
 
   <div class="banner" id="banner"></div>
@@ -601,6 +638,68 @@
   var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   var STORE = "liftvoice.stt.v1";
 
+  var STORE_SESSION = "liftvoice.session.v1";
+
+  function buildInitialSession() {
+    return {
+      currentPart: 0,
+      currentExercise: 0,
+      pendingSubstitute: null,
+      parts: SESSION_ROUTINE.map(function (part) {
+        return {
+          name: part.name,
+          exercises: part.exercises.map(function (ex) {
+            return {
+              id: ex.id,
+              name: ex.name,
+              isMain: ex.isMain,
+              targetSets: ex.targetSets,
+              targetReps: ex.targetReps.slice(),
+              sets: [],
+              comments: [],
+              substitutedFrom: null
+            };
+          })
+        };
+      })
+    };
+  }
+
+  function loadSession() {
+    try {
+      var raw = localStorage.getItem(STORE_SESSION);
+      if (raw) {
+        var parsed = JSON.parse(raw);
+        if (parsed && Array.isArray(parsed.parts) && parsed.parts.length) {
+          // 저장된 인덱스가 배열 범위를 벗어나면 currentSessionExercise()가
+          // 부팅 중 renderSession()에서 throw하고, 그러면 buildRecognizer()
+          // 이전이라 free/script 모드까지 전부 죽는다. 방어적으로 clamp한다.
+          var pi = Number(parsed.currentPart);
+          if (!isFinite(pi)) pi = 0;
+          pi = Math.min(Math.max(Math.floor(pi), 0), parsed.parts.length - 1);
+          var part = parsed.parts[pi];
+          if (!part || !Array.isArray(part.exercises) || !part.exercises.length) {
+            return buildInitialSession();
+          }
+          var ei = Number(parsed.currentExercise);
+          if (!isFinite(ei)) ei = 0;
+          ei = Math.min(Math.max(Math.floor(ei), 0), part.exercises.length - 1);
+          parsed.currentPart = pi;
+          parsed.currentExercise = ei;
+          if (!parsed.pendingSubstitute) parsed.pendingSubstitute = null;
+          return parsed;
+        }
+      }
+    } catch (e) { /* corrupt or unavailable storage: start fresh */ }
+    return buildInitialSession();
+  }
+
+  function saveSession() {
+    try {
+      localStorage.setItem(STORE_SESSION, JSON.stringify(state.session));
+    } catch (e) { /* quota or private mode: keep working in memory */ }
+  }
+
   var SCRIPT_LINES = [
     "스쿼트 100 5개",
     "벤치프레스 80 8개",
@@ -622,6 +721,26 @@
     "케이블 플라이 20 15개",
     "런지 40 10개",
     "플랭크 60초"
+  ];
+
+  var SESSION_ROUTINE = [
+    {
+      name: "어깨",
+      exercises: [
+        { id: "overhead_press", name: "오버헤드프레스", isMain: true, targetSets: 4, targetReps: [6, 8] },
+        { id: "lateral_raise", name: "사이드 레터럴 레이즈", isMain: false, targetSets: 4, targetReps: [12, 15] },
+        { id: "face_pull", name: "페이스풀/리어델트", isMain: false, targetSets: 3, targetReps: [15, 15] }
+      ]
+    },
+    {
+      name: "등",
+      exercises: [
+        { id: "pullup", name: "풀업", isMain: false, targetSets: 4, targetReps: [6, 10] },
+        { id: "barbell_row", name: "바벨/덤벨로우", isMain: false, targetSets: 4, targetReps: [8, 10] },
+        { id: "lat_pulldown", name: "랫풀다운", isMain: false, targetSets: 4, targetReps: [10, 12] },
+        { id: "seated_cable_row", name: "시티드 케이블 로우", isMain: false, targetSets: 3, targetReps: [12, 12] }
+      ]
+    }
   ];
 
   var NUM_WORDS = {
@@ -727,6 +846,82 @@
     return normalize(expected) === normalize(heard);
   }
 
+  function wordsToDigitString(text) {
+    var s = String(text == null ? "" : text).toLowerCase();
+    s = s.replace(/kg|킬로그램|킬로|키로/g, "키로");
+    var words = s.split(/\s+/).filter(function (w) { return w.length > 0; });
+    var out = words.map(function (w) {
+      var m = w.match(/^(.+?)(개|회|번|초|키로)$/);
+      if (m && Object.prototype.hasOwnProperty.call(NUM_WORDS, m[1])) {
+        return NUM_WORDS[m[1]] + m[2];
+      }
+      if (Object.prototype.hasOwnProperty.call(NUM_WORDS, w)) {
+        return NUM_WORDS[w];
+      }
+      return w;
+    });
+    return out.join(" ");
+  }
+
+  function classifyCommand(rawText) {
+    var text = wordsToDigitString(rawText).trim();
+
+    var adjustWeight = text.match(/방금\s*(?:세트|거)?\s*(\d+(?:\.\d+)?)\s*키로\s*(더|빼)/);
+    if (adjustWeight) {
+      return {
+        type: "SET_ADJUST_WEIGHT",
+        amountKg: parseFloat(adjustWeight[1]),
+        direction: adjustWeight[2] === "더" ? "add" : "subtract"
+      };
+    }
+
+    var adjustReps = text.match(/방금\s*거\s*(\d+)\s*개로\s*수정/);
+    if (adjustReps) {
+      return { type: "SET_ADJUST_REPS", reps: parseInt(adjustReps[1], 10) };
+    }
+
+    var comment = text.match(/^(?:코멘트|메모)\s*[:,]?\s*(.+)$/);
+    if (comment) {
+      return { type: "COMMENT", text: comment[1].trim() };
+    }
+
+    if (/힘들어|컨디션\s*별로/.test(text)) {
+      return { type: "CONDITION", text: rawText.trim() };
+    }
+
+    if (/자리\s*없어|기구\s*없어|없어서|없네/.test(text)) {
+      return { type: "SUBSTITUTE_REQUEST" };
+    }
+
+    var targetSetsExact = text.match(/^(\d+)\s*세트만$/);
+    if (targetSetsExact) {
+      return { type: "TARGET_ADJUST", mode: "set", targetSets: parseInt(targetSetsExact[1], 10) };
+    }
+    if (/세트\s*(?:하나|1)\s*빼자/.test(text)) {
+      return { type: "TARGET_ADJUST", mode: "delta", delta: -1 };
+    }
+
+    if (/^다음\s*종목$/.test(text)) {
+      return { type: "NEXT_EXERCISE" };
+    }
+
+    if (/오늘\s*끝|운동\s*끝/.test(text)) {
+      return { type: "SESSION_END" };
+    }
+
+    // UI가 "목표 4세트 × 6~8회"라고 보여주므로 "회"/"번"도 "개"와 동일하게 받는다.
+    var setLog = text.match(/^(?:(\d+(?:\.\d+)?)\s*키로\s*)?(\d+)\s*(?:개|회|번)$/);
+    if (setLog) {
+      return {
+        type: "SET_LOG",
+        weightKg: setLog[1] ? parseFloat(setLog[1]) : null,
+        reps: parseInt(setLog[2], 10)
+      };
+    }
+
+    return { type: "UNRECOGNIZED" };
+  }
+
   function selfTest() {
     var cases = [
       ["스쿼트 100 5개", "스쿼트 100 5개", true],
@@ -762,6 +957,41 @@
     return { pass: pass, fail: fail, failures: failures };
   }
 
+  function selfTestCommands() {
+    var cases = [
+      ["방금 세트 2.5키로 더", { type: "SET_ADJUST_WEIGHT", amountKg: 2.5, direction: "add" }],
+      ["방금 세트 5키로 빼", { type: "SET_ADJUST_WEIGHT", amountKg: 5, direction: "subtract" }],
+      ["방금 거 6개로 수정", { type: "SET_ADJUST_REPS", reps: 6 }],
+      ["코멘트 어깨 뻐근함", { type: "COMMENT", text: "어깨 뻐근함" }],
+      ["지금 힘들어", { type: "CONDITION", text: "지금 힘들어" }],
+      ["여기 자리 없어", { type: "SUBSTITUTE_REQUEST" }],
+      ["3세트만", { type: "TARGET_ADJUST", mode: "set", targetSets: 3 }],
+      ["세트 하나 빼자", { type: "TARGET_ADJUST", mode: "delta", delta: -1 }],
+      ["다음 종목", { type: "NEXT_EXERCISE" }],
+      ["오늘 끝", { type: "SESSION_END" }],
+      ["45키로 8개", { type: "SET_LOG", weightKg: 45, reps: 8 }],
+      ["8개", { type: "SET_LOG", weightKg: null, reps: 8 }],
+      ["여덟개", { type: "SET_LOG", weightKg: null, reps: 8 }],
+      ["45키로 8회", { type: "SET_LOG", weightKg: 45, reps: 8 }],
+      ["8번", { type: "SET_LOG", weightKg: null, reps: 8 }],
+      ["여덟번", { type: "SET_LOG", weightKg: null, reps: 8 }],
+      ["45키로 여덟 회", { type: "SET_LOG", weightKg: 45, reps: 8 }],
+      ["아무말 대잔치", { type: "UNRECOGNIZED" }]
+    ];
+    var pass = 0, fail = 0, failures = [];
+    cases.forEach(function (c) {
+      var got = classifyCommand(c[0]);
+      var ok = JSON.stringify(got) === JSON.stringify(c[1]);
+      if (ok) {
+        pass++;
+      } else {
+        fail++;
+        failures.push('"' + c[0] + '" -> ' + JSON.stringify(got) + ", 기대 " + JSON.stringify(c[1]));
+      }
+    });
+    return { pass: pass, fail: fail, failures: failures };
+  }
+
   var el = {
     banner: document.getElementById("banner"),
     conds: document.getElementById("conds"),
@@ -786,7 +1016,18 @@
     scriptActions: document.getElementById("script-actions"),
     btnSkip: document.getElementById("btn-skip"),
     btnMisheard: document.getElementById("btn-misheard"),
-    btnMisread: document.getElementById("btn-misread")
+    btnMisread: document.getElementById("btn-misread"),
+    sessionPanel: document.getElementById("session-panel"),
+    sessionPartName: document.getElementById("session-part-name"),
+    sessionProgress: document.getElementById("session-progress"),
+    sessionExerciseName: document.getElementById("session-exercise-name"),
+    sessionTarget: document.getElementById("session-target"),
+    sessionLog: document.getElementById("session-log"),
+    sessionSubBanner: document.getElementById("session-sub-banner"),
+    sessionSubActions: document.getElementById("session-sub-actions"),
+    btnSubApply: document.getElementById("btn-sub-apply"),
+    btnSubDismiss: document.getElementById("btn-sub-dismiss"),
+    sessionCondBanner: document.getElementById("session-cond-banner")
   };
 
   var state = {
@@ -799,7 +1040,12 @@
     pendingHeard: "",
     scriptScored: false,
     scriptGen: 0,
-    scriptTimer: null
+    scriptTimer: null,
+    session: null,
+    // 표시 전용(비영속) 배너 상태. renderSession()이 매 렌더마다 배너를
+    // 강제로 숨기기 때문에, 배너를 렌더 사이에 살려두려면 state가 필요하다.
+    sessionCondMessage: null,  // 컨디션 배너: 다음 종목/다음 컨디션 보고까지 유지
+    sessionSubMessage: null    // "대체 후보 없음" 일회성 안내: 다음 렌더에서 소진
   };
 
   var rec = null;
@@ -982,6 +1228,101 @@
     el.scriptActions.classList.remove("show");
   }
 
+  function currentSessionExercise() {
+    var part = state.session.parts[state.session.currentPart];
+    return part.exercises[state.session.currentExercise];
+  }
+
+  function renderSession() {
+    el.sessionPanel.classList.toggle("show", state.mode === "session");
+    if (state.mode !== "session") return;
+
+    var part = state.session.parts[state.session.currentPart];
+    var ex = currentSessionExercise();
+
+    el.sessionPartName.textContent = part.name;
+    el.sessionProgress.textContent =
+      (state.session.currentExercise + 1) + " / " + part.exercises.length + " 종목";
+    el.sessionExerciseName.textContent = ex.name;
+
+    var repsLabel = ex.targetReps[0] === ex.targetReps[1]
+      ? String(ex.targetReps[0])
+      : ex.targetReps[0] + "~" + ex.targetReps[1];
+    el.sessionTarget.textContent =
+      "목표 " + ex.targetSets + "세트 × " + repsLabel + "회 · " + ex.sets.length + "/" + ex.targetSets;
+
+    el.sessionLog.textContent = "";
+    ex.sets.slice().reverse().forEach(function (s, i) {
+      var setNum = ex.sets.length - i;
+      var row = document.createElement("div");
+      row.className = "session-set";
+      row.textContent = setNum + "세트: " + s.weight + "kg × " + s.reps + "회";
+      el.sessionLog.appendChild(row);
+    });
+    ex.comments.slice().reverse().forEach(function (c) {
+      var row = document.createElement("div");
+      row.className = "session-set comment";
+      row.textContent = c.text;
+      el.sessionLog.appendChild(row);
+    });
+
+    // 배너는 DOM이 아니라 state에서 렌더한다. 예전에는 여기서 무조건
+    // 숨겼기 때문에 (a) 컨디션 배너가 같은 turn에 지워지고 (b) 대체 제안이
+    // 다음 명령 한 번에 날아갔다.
+    var pend = state.session.pendingSubstitute;
+    if (pend && pend.exerciseId === ex.id) {
+      el.sessionSubBanner.innerHTML = "<strong>" + pend.subName + "</strong>로 대체할까요?";
+      el.sessionSubBanner.classList.add("show");
+      el.sessionSubActions.classList.add("show");
+    } else if (state.sessionSubMessage) {
+      el.sessionSubBanner.textContent = state.sessionSubMessage;
+      el.sessionSubBanner.classList.add("show");
+      el.sessionSubActions.classList.remove("show");
+      state.sessionSubMessage = null; // 취할 액션이 없는 안내라 일회성으로 소진
+    } else {
+      el.sessionSubBanner.classList.remove("show");
+      el.sessionSubActions.classList.remove("show");
+    }
+
+    if (state.sessionCondMessage) {
+      el.sessionCondBanner.textContent = state.sessionCondMessage;
+      el.sessionCondBanner.classList.add("show");
+    } else {
+      el.sessionCondBanner.classList.remove("show");
+    }
+  }
+
+  function renderSessionSummaryExport() {
+    var lines = [];
+    lines.push("LiftVoice 세션 요약 — " + new Date().toISOString().slice(0, 10));
+    lines.push("");
+    state.session.parts.forEach(function (part) {
+      lines.push("=== " + part.name + " ===");
+      part.exercises.forEach(function (ex) {
+        if (!ex.sets.length && !ex.comments.length) return;
+        var label = ex.name + (ex.substitutedFrom ? " (원래 종목: " + ex.substitutedFrom + ")" : "");
+        lines.push(label + ":");
+        ex.sets.forEach(function (s, i) {
+          lines.push("  " + (i + 1) + "세트 " + s.weight + "kg x " + s.reps + "회");
+        });
+        ex.comments.forEach(function (c) {
+          lines.push("  메모: " + c.text);
+        });
+      });
+      lines.push("");
+    });
+    var text = lines.join("\n");
+    el.exportBox.textContent = text;
+    el.exportBox.classList.add("show");
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () {
+        el.btnExport.textContent = "복사됨";
+        setTimeout(function () { el.btnExport.textContent = "결과 보기 / 복사"; }, 1600);
+      }, function () { /* clipboard blocked: text is on screen to select */ });
+    }
+  }
+
   function advanceScript() {
     // Bumping the generation and clearing any pending timer is what makes
     // a stale auto-advance (Critical 1) and a stale re-read (Critical 2)
@@ -1046,6 +1387,114 @@
     el.scriptActions.classList.add("show");
   }
 
+  function advanceSessionExercise() {
+    var part = state.session.parts[state.session.currentPart];
+    if (state.session.currentExercise < part.exercises.length - 1) {
+      state.session.currentExercise++;
+    } else if (state.session.currentPart < state.session.parts.length - 1) {
+      state.session.currentPart++;
+      state.session.currentExercise = 0;
+    }
+    // 이전 종목에 대한 대체 제안/컨디션 배너는 새 종목에서 의미가 없다.
+    state.session.pendingSubstitute = null;
+    state.sessionCondMessage = null;
+    state.sessionSubMessage = null;
+    saveSession();
+    renderSession();
+  }
+
+  var SESSION_SUBSTITUTES = {
+    overhead_press: { name: "덤벨숄더프레스", why: "덤벨만 있으면 가능, 가동범위 더 큼" },
+    lat_pulldown: { name: "어시스티드 풀업", why: "수직 당기기 궤적 동일" }
+  };
+
+  function showSubstituteSuggestion(ex) {
+    var sub = SESSION_SUBSTITUTES[ex.id];
+    if (!sub) {
+      state.session.pendingSubstitute = null;
+      state.sessionSubMessage = "이 종목은 등록된 대체 후보가 없어요. 직접 판단해서 진행하세요.";
+      return;
+    }
+    // DOM이 아니라 state에 담아 renderSession()이 매번 다시 그리게 한다.
+    state.session.pendingSubstitute = { exerciseId: ex.id, subName: sub.name };
+    state.sessionSubMessage = null;
+  }
+
+  function applySubstitute() {
+    var ex = currentSessionExercise();
+    var sub = SESSION_SUBSTITUTES[ex.id];
+    state.session.pendingSubstitute = null;
+    if (!sub) {
+      saveSession();
+      renderSession();
+      return;
+    }
+    ex.substitutedFrom = ex.name;
+    ex.name = sub.name;
+    saveSession();
+    renderSession();
+  }
+
+  function handleSessionCommand(text) {
+    var cmd = classifyCommand(text);
+    var ex = currentSessionExercise();
+
+    switch (cmd.type) {
+      case "SET_ADJUST_WEIGHT": {
+        var lastSet = ex.sets[ex.sets.length - 1];
+        if (!lastSet) return;
+        lastSet.weight = cmd.direction === "add"
+          ? lastSet.weight + cmd.amountKg
+          : lastSet.weight - cmd.amountKg;
+        break;
+      }
+      case "SET_ADJUST_REPS": {
+        var last = ex.sets[ex.sets.length - 1];
+        if (!last) return;
+        last.reps = cmd.reps;
+        break;
+      }
+      case "COMMENT":
+        ex.comments.push({ text: cmd.text, ts: new Date().toISOString() });
+        break;
+      case "CONDITION":
+        ex.comments.push({ text: "[컨디션] " + cmd.text, ts: new Date().toISOString() });
+        state.sessionCondMessage = "기록했어요. 무리하지 마세요.";
+        break;
+      case "SUBSTITUTE_REQUEST":
+        showSubstituteSuggestion(ex);
+        break; // 배너는 state에 있으므로 renderSession()이 안전하게 다시 그린다
+      case "TARGET_ADJUST":
+        if (cmd.mode === "set") {
+          ex.targetSets = cmd.targetSets;
+        } else {
+          ex.targetSets = Math.max(1, ex.targetSets + cmd.delta);
+        }
+        break;
+      case "NEXT_EXERCISE":
+        advanceSessionExercise();
+        return; // advanceSessionExercise가 자체적으로 save/render 처리
+      case "SESSION_END":
+        renderSessionSummaryExport();
+        return;
+      case "SET_LOG": {
+        var weight = cmd.weightKg;
+        if (weight == null) {
+          var prevSet = ex.sets[ex.sets.length - 1];
+          weight = prevSet ? prevSet.weight : null;
+        }
+        if (weight == null) return; // 첫 세트에서 무게를 안 말하면 조용히 무시
+        ex.sets.push({ weight: weight, reps: cmd.reps, ts: new Date().toISOString() });
+        break;
+      }
+      default:
+        return; // UNRECOGNIZED — addEntry()로 로그에는 이미 남았음
+    }
+
+    saveSession();
+    renderSession();
+  }
+
   function recordScript(expected, heard, verdict) {
     var now = new Date();
     state.entries.push({
@@ -1094,6 +1543,9 @@
         renderTranscript(finalText.trim(), "");
         if (state.mode === "script") {
           handleScriptResult(finalText.trim());
+        } else if (state.mode === "session") {
+          addEntry(finalText);
+          handleSessionCommand(finalText.trim());
         } else {
           addEntry(finalText);
         }
@@ -1231,6 +1683,7 @@
       c.setAttribute("aria-pressed", c === btn ? "true" : "false");
     });
     renderScript();
+    renderSession();
   });
 
   el.btnSkip.addEventListener("click", advanceScript);
@@ -1243,6 +1696,17 @@
   // 사용자가 문장을 잘못 읽은 경우는 인식기 성능이 아니므로 집계에서 뺀다.
   el.btnMisread.addEventListener("click", advanceScript);
 
+  el.btnSubApply.addEventListener("click", function () {
+    applySubstitute();
+  });
+
+  el.btnSubDismiss.addEventListener("click", function () {
+    state.session.pendingSubstitute = null;
+    state.sessionSubMessage = null;
+    saveSession();
+    renderSession();
+  });
+
   // Backgrounding the page tears down the audio session; stop cleanly
   // rather than leaving the UI stuck on "듣는 중".
   document.addEventListener("visibilitychange", function () {
@@ -1250,6 +1714,10 @@
   });
 
   el.btnExport.addEventListener("click", function () {
+    if (state.mode === "session") {
+      renderSessionSummaryExport();
+      return;
+    }
     if (!state.entries.length) {
       el.exportBox.textContent = "기록이 없습니다.";
       el.exportBox.classList.add("show");
@@ -1317,10 +1785,12 @@
 
   /* ---------- boot ---------- */
 
+  state.session = loadSession();
   load();
   renderLog();
   renderStats();
   renderScript();
+  renderSession();
 
   // Android WebView exposes SpeechRecognition but never fires its events,
   // so this must be checked before the constructor test below.
@@ -1353,6 +1823,17 @@
     showBanner("<strong>보안 연결(HTTPS)이 아닙니다.</strong> 마이크를 쓸 수 없습니다.", true);
     return;
   }
+
+  (function runSelfTests() {
+    var r1 = selfTest();
+    var r2 = selfTestCommands();
+    var totalFail = r1.fail + r2.fail;
+    if (totalFail) {
+      console.error("[LiftVoice] self-test failures:", r1.failures.concat(r2.failures));
+    } else {
+      console.log("[LiftVoice] self-test OK (" + (r1.pass + r2.pass) + " cases)");
+    }
+  })();
 
   rec = buildRecognizer();
 })();
