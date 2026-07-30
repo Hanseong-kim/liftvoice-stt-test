@@ -525,15 +525,42 @@
     align-items: center;
     gap: 8px;
   }
+  .session-workout-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 2px;
+  }
   .session-elapsed {
     font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
     color: var(--muted);
+    margin-left: auto;
   }
+  .session-start-btn,
   .session-end-btn {
-    margin-top: 12px;
-    width: 100%;
-    border-color: var(--hot);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 650;
+    padding: 8px 12px;
+    min-height: 40px;
+    border-radius: 8px;
+    cursor: pointer;
+    flex: none;
+  }
+  .session-start-btn {
+    border: 1px solid var(--good);
+    background: none;
+    color: var(--good);
+  }
+  .session-start-btn[hidden],
+  .session-end-btn[hidden] { display: none; }
+  .session-end-btn {
+    border: 1px solid var(--hot);
+    background: none;
+    color: var(--hot);
   }
 
   /* ---- routine overlay ---- */
@@ -1149,10 +1176,14 @@
   </div>
 
   <div class="script-panel" id="session-panel">
+    <div class="session-workout-bar">
+      <button class="session-start-btn" type="button" id="btn-session-start">▶ 운동 시작</button>
+      <button class="session-end-btn" type="button" id="btn-session-end">■ 운동 종료</button>
+      <span class="session-elapsed" id="session-elapsed"></span>
+    </div>
     <div class="script-meta">
       <span id="session-part-name">어깨</span>
       <span class="session-meta-right">
-        <span class="session-elapsed" id="session-elapsed"></span>
         <span id="session-progress">1 / 3 종목</span>
         <button class="skip" type="button" id="btn-help-open">명령어</button>
         <button class="skip" type="button" id="btn-routine-overview">전체 루틴</button>
@@ -1179,7 +1210,6 @@
       <button class="vbtn" type="button" id="btn-sub-dismiss">그냥 이대로</button>
     </div>
     <div class="banner" id="session-cond-banner"></div>
-    <button class="tbtn danger session-end-btn" type="button" id="btn-session-end">운동 종료</button>
   </div>
 
   <div class="banner" id="banner"></div>
@@ -1525,6 +1555,7 @@
               restSec: ex.restSec,
               sets: [],
               comments: [],
+              setNotes: {}, // 아직 완료 안 한 세트에 미리 달아둔 메모: { "세트인덱스": "텍스트" }
               substitutedFrom: null
             };
           })
@@ -1557,6 +1588,12 @@
           if (!parsed.pendingSubstitute) parsed.pendingSubstitute = null;
           if (typeof parsed.startedAt !== "number") parsed.startedAt = null;
           if (typeof parsed.endedAt !== "number") parsed.endedAt = null;
+          // 구버전에 저장된 세션엔 setNotes가 없을 수 있다.
+          parsed.parts.forEach(function (p) {
+            p.exercises.forEach(function (ex) {
+              if (!ex.setNotes || typeof ex.setNotes !== "object") ex.setNotes = {};
+            });
+          });
           return parsed;
         }
       }
@@ -1934,6 +1971,7 @@
     sessionElapsed: document.getElementById("session-elapsed"),
     sessionTargetSetsInput: document.getElementById("session-target-sets-input"),
     sessionRestInput: document.getElementById("session-rest-input"),
+    btnSessionStart: document.getElementById("btn-session-start"),
     btnSessionEnd: document.getElementById("btn-session-end"),
     sessionRestTimer: document.getElementById("session-rest-timer"),
     sessionLog: document.getElementById("session-log"),
@@ -2196,6 +2234,9 @@
       el.sessionTargetSetsInput.value = ex.targetSets;
     }
 
+    var workoutActive = !!state.session.startedAt && !state.session.endedAt;
+    el.btnSessionStart.hidden = workoutActive;
+    el.btnSessionEnd.hidden = !workoutActive;
     renderElapsed();
     renderRestTimer();
     renderSetPlan(ex);
@@ -2375,6 +2416,15 @@
               cRow.className = "comment-row";
               cRow.textContent = "메모: " + c.text;
               detail.appendChild(cRow);
+            });
+          }
+
+          if (ex.setNotes) {
+            Object.keys(ex.setNotes).sort(function (a, b) { return Number(a) - Number(b); }).forEach(function (key) {
+              var nRow = document.createElement("div");
+              nRow.className = "comment-row";
+              nRow.textContent = (Number(key) + 1) + "세트 예정 메모: " + ex.setNotes[key];
+              detail.appendChild(nRow);
             });
           }
 
@@ -2567,6 +2617,7 @@
       restSec: data.restSec,
       sets: [],
       comments: [],
+      setNotes: {},
       substitutedFrom: null
     });
     state.routineAddingPart = null;
@@ -2807,23 +2858,24 @@
 
       head.appendChild(fields);
 
-      if (doneSet) {
-        var memoBtn = document.createElement("button");
-        memoBtn.type = "button";
-        memoBtn.className = "set-memo-btn";
-        memoBtn.setAttribute("data-set-key", String(i));
-        memoBtn.textContent = doneSet.comment ? "메모 수정" : "메모 추가";
-        head.appendChild(memoBtn);
-      }
+      // 완료 여부와 상관없이 모든 세트에 메모 버튼을 둔다. 아직 안 한 세트의
+      // 메모는 ex.setNotes에 예약해뒀다가 그 세트가 실제로 기록될 때 옮겨 붙는다.
+      var existingNote = doneSet ? doneSet.comment : (ex.setNotes && ex.setNotes[String(i)]);
+      var memoBtn = document.createElement("button");
+      memoBtn.type = "button";
+      memoBtn.className = "set-memo-btn";
+      memoBtn.setAttribute("data-set-key", String(i));
+      memoBtn.textContent = existingNote ? "메모 수정" : "메모";
+      head.appendChild(memoBtn);
       row.appendChild(head);
 
-      if (doneSet && state.editingSetKey === String(i)) {
+      if (state.editingSetKey === String(i)) {
         var input = document.createElement("input");
         input.type = "text";
         input.className = "set-memo-input";
         input.setAttribute("data-set-key", String(i));
         input.placeholder = "이 세트 메모";
-        input.value = doneSet.comment || "";
+        input.value = existingNote || "";
         row.appendChild(input);
         (function (inputEl) {
           requestAnimationFrame(function () {
@@ -2831,10 +2883,10 @@
             inputEl.setSelectionRange(inputEl.value.length, inputEl.value.length);
           });
         })(input);
-      } else if (doneSet && doneSet.comment) {
+      } else if (existingNote) {
         var cmt = document.createElement("div");
         cmt.className = "set-memo-text";
-        cmt.textContent = doneSet.comment;
+        cmt.textContent = existingNote;
         row.appendChild(cmt);
       }
 
@@ -2879,24 +2931,48 @@
     return prev ? prev.weight : 0;
   }
 
+  // 세트가 아직 완료되기 전에 미리 달아둔 메모(ex.setNotes)를 그 세트가
+  // 실제로 생성되는 순간(완료 체크·음성 SET_LOG·건너뛴 세트 자동 채움) 가져와서
+  // 소비한다. 있으면 반환하고 setNotes에서는 지운다.
+  function takePendingNote(ex, idx) {
+    var key = String(idx);
+    if (ex.setNotes && ex.setNotes[key]) {
+      var note = ex.setNotes[key];
+      delete ex.setNotes[key];
+      return note;
+    }
+    return null;
+  }
+
   function ensureSetsUpTo(ex, idx) {
     while (ex.sets.length < idx) {
       var i = ex.sets.length;
-      ex.sets.push({
+      var skippedSet = {
         weight: readRowFieldValue(ex, i, "weight"),
         reps: readRowFieldValue(ex, i, "reps"),
         ts: new Date().toISOString()
-      });
+      };
+      var pendingForSkipped = takePendingNote(ex, i);
+      if (pendingForSkipped) skippedSet.comment = pendingForSkipped;
+      ex.sets.push(skippedSet);
     }
   }
 
+  // 메모는 세트 완료 여부와 무관하게 언제든 달 수 있다: 이미 기록된 세트면
+  // 그 세트에 바로 붙이고, 아직 안 한 세트면 ex.setNotes에 예약해뒀다가
+  // 나중에 그 세트가 실제로 기록될 때 옮겨 붙는다(takePendingNote).
   function commitSetComment(input) {
     var key = input.getAttribute("data-set-key");
+    var ex = currentSessionExercise();
+    var text = input.value.trim();
     var found = findSetByKey(key);
     if (found) {
-      found.set.comment = input.value.trim();
-      saveSession();
+      found.set.comment = text;
+    } else {
+      if (!ex.setNotes) ex.setNotes = {};
+      if (text) ex.setNotes[key] = text; else delete ex.setNotes[key];
     }
+    saveSession();
     state.editingSetKey = null;
     renderSession();
   }
@@ -2914,6 +2990,10 @@
     var existing = ex.sets[idx] || { ts: new Date().toISOString() };
     existing.weight = !isNaN(weightNum) ? toStoredKg(weightNum) : (existing.weight != null ? existing.weight : readRowFieldValue(ex, idx, "weight"));
     existing.reps = !isNaN(repsNum) ? Math.round(repsNum) : (existing.reps != null ? existing.reps : readRowFieldValue(ex, idx, "reps"));
+    if (!existing.comment) {
+      var pendingNote = takePendingNote(ex, idx);
+      if (pendingNote) existing.comment = pendingNote;
+    }
     ex.sets[idx] = existing;
     saveSession();
   }
@@ -2991,10 +3071,14 @@
     el.sessionRestTimer.textContent = restCountdownText(remaining);
   }
 
-  // 첫 세트를 기록하는 순간 운동 시작 시각을 못박는다. 이미 시작돼 있으면 아무 것도 안 함.
+  // 전체 운동(세션) 단위의 시작 시각을 못박는다 — 특정 종목이 아니라 오늘 세션 전체.
+  // 아직 한 번도 시작 안 했거나, 이전에 종료했다가 다시 세트를 기록하는 경우
+  // 둘 다 여기서 처리한다(재시작 시 시계는 0부터 다시 잰다).
   function markSessionStarted() {
-    if (!state.session.startedAt) {
+    if (!state.session.startedAt || state.session.endedAt) {
       state.session.startedAt = Date.now();
+      state.session.endedAt = null;
+      saveSession();
       startElapsedTicker();
     }
   }
@@ -3032,6 +3116,31 @@
     renderElapsed();
     saveSession();
     renderSessionSummaryExport();
+  }
+
+  // 세트 메모·종목 메모·아직 완료 안 한 세트에 예약된 메모까지 전부 모아서,
+  // 각 줄이 어떤 파트/종목/세트인지 스스로 밝히는 태그를 붙인다.
+  // 나중에 이 줄 하나만 메모장에 따로 붙여넣어도 무슨 내용인지 알 수 있게 하기 위함.
+  function collectAllMemos() {
+    var memos = [];
+    state.session.parts.forEach(function (part) {
+      part.exercises.forEach(function (ex) {
+        ex.sets.forEach(function (s, i) {
+          if (s.comment) {
+            memos.push({ tag: part.name + " · " + ex.name + " · " + (i + 1) + "세트", text: s.comment });
+          }
+        });
+        ex.comments.forEach(function (c) {
+          memos.push({ tag: part.name + " · " + ex.name, text: c.text });
+        });
+        if (ex.setNotes) {
+          Object.keys(ex.setNotes).sort(function (a, b) { return Number(a) - Number(b); }).forEach(function (key) {
+            memos.push({ tag: part.name + " · " + ex.name + " · " + (Number(key) + 1) + "세트 (예정)", text: ex.setNotes[key] });
+          });
+        }
+      });
+    });
+    return memos;
   }
 
   function renderSessionSummaryExport() {
@@ -3073,6 +3182,15 @@
 
     lines.push("--- 요약 ---");
     lines.push("완료 종목: " + touchedExercises + "개 · 완료 세트: " + totalSets + "개");
+
+    var memos = collectAllMemos();
+    if (memos.length) {
+      lines.push("");
+      lines.push("--- 메모 모음 (메모장에 따로 붙여넣어도 되게 태그 포함) ---");
+      memos.forEach(function (m) {
+        lines.push("[" + m.tag + "] " + m.text);
+      });
+    }
 
     var text = lines.join("\n");
     el.exportBox.textContent = text;
@@ -3277,7 +3395,10 @@
         }
         if (weight == null) return; // 첫 세트에서 무게를 안 말하면 조용히 무시
         markSessionStarted();
-        ex.sets.push({ weight: weight, reps: cmd.reps, ts: new Date().toISOString() });
+        var newSet = { weight: weight, reps: cmd.reps, ts: new Date().toISOString() };
+        var pendingNoteForNewSet = takePendingNote(ex, ex.sets.length);
+        if (pendingNoteForNewSet) newSet.comment = pendingNoteForNewSet;
+        ex.sets.push(newSet);
         startRestCountdown(ex.restSec || 90);
         break;
       }
@@ -3548,6 +3669,10 @@
     renderSession();
   });
 
+  el.btnSessionStart.addEventListener("click", function () {
+    markSessionStarted();
+    renderSession();
+  });
   el.btnSessionEnd.addEventListener("click", endWorkoutSession);
 
   el.btnRoutineClose.addEventListener("click", closeRoutineOverlay);
@@ -3579,8 +3704,14 @@
     }
     var memoBtn = event.target.closest(".set-memo-btn");
     if (!memoBtn) return;
-    commitSetRowData(memoBtn.closest(".session-set"));
     var key = memoBtn.getAttribute("data-set-key");
+    var exForMemo = currentSessionExercise();
+    if (exForMemo.sets[Number(key)]) {
+      // 이미 완료된 세트: 메모창을 열기 전에 화면에 보이는 무게·반복 수정값도 같이 반영
+      commitSetRowData(memoBtn.closest(".session-set"));
+    }
+    // 아직 완료 안 한 세트는 여기서 commitSetRowData를 부르지 않는다 —
+    // 메모만 달려고 눌렀는데 세트가 조기 완료 처리되면 안 되니까.
     state.editingSetKey = state.editingSetKey === key ? null : key;
     renderSession();
   });
