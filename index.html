@@ -1408,7 +1408,7 @@
         </div>
         <div class="cmd-item">
           <div class="cmd-example">금요일 루틴 시작 / 목요일 루틴으로 시작해줘</div>
-          <div class="cmd-desc">저장된 다른 요일 루틴으로 전환 (지금 기록된 세트가 있으면 확인 후 새로 시작)</div>
+          <div class="cmd-desc">저장된 다른 요일 루틴으로 전환 (요일별 기록은 서로 따로 보존됨)</div>
         </div>
       </div>
 
@@ -1555,10 +1555,14 @@
     };
   }
 
-  // 사용자가 다른 요일 루틴으로 전환할 때 쓴다 — 지금 세션은 통째로 새
-  // 루틴 템플릿으로 교체된다(기록된 세트는 사라지므로 호출 전에 확인 필요).
+  // 사용자가 다른 요일 루틴으로 전환할 때 쓴다. 지금 루틴의 진행 상태는
+  // state.routineSessions에 캐시해뒀다가, 그 루틴으로 돌아오면 그대로
+  // 복원한다 — 요일마다 독립적으로 기록이 쌓이고 서로 지우지 않는다.
   function switchRoutine(routineName) {
-    state.session = buildInitialSession(routineName);
+    var name = ROUTINE_LIBRARY[routineName] ? routineName : DEFAULT_ROUTINE_NAME;
+    state.routineSessions[state.session.routineName] = state.session;
+    state.session = state.routineSessions[name] || buildInitialSession(name);
+    delete state.routineSessions[name];
     state.session.pendingSubstitute = null;
     state.sessionCondMessage = null;
     state.sessionSubMessage = null;
@@ -1570,51 +1574,87 @@
     renderSession();
   }
 
+  // 구버전에 저장된 세션엔 setNotes가 없을 수 있고, targetReps가
+  // [최소, 최대] 배열이던 시절 데이터도 있을 수 있다. 저장 형태가
+  // 깨져 있으면(파트가 없거나 인덱스가 범위 밖) null을 돌려준다.
+  function normalizeStoredSession(parsed) {
+    if (!parsed || !Array.isArray(parsed.parts) || !parsed.parts.length) return null;
+    // 저장된 인덱스가 배열 범위를 벗어나면 currentSessionExercise()가
+    // 부팅 중 renderSession()에서 throw하고, 그러면 buildRecognizer()
+    // 이전이라 free/script 모드까지 전부 죽는다. 방어적으로 clamp한다.
+    var pi = Number(parsed.currentPart);
+    if (!isFinite(pi)) pi = 0;
+    pi = Math.min(Math.max(Math.floor(pi), 0), parsed.parts.length - 1);
+    var part = parsed.parts[pi];
+    if (!part || !Array.isArray(part.exercises) || !part.exercises.length) return null;
+    var ei = Number(parsed.currentExercise);
+    if (!isFinite(ei)) ei = 0;
+    ei = Math.min(Math.max(Math.floor(ei), 0), part.exercises.length - 1);
+    parsed.currentPart = pi;
+    parsed.currentExercise = ei;
+    if (!parsed.pendingSubstitute) parsed.pendingSubstitute = null;
+    parsed.parts.forEach(function (p) {
+      p.exercises.forEach(function (ex) {
+        if (!ex.setNotes || typeof ex.setNotes !== "object") ex.setNotes = {};
+        if (Array.isArray(ex.targetReps)) {
+          ex.targetReps = ex.targetReps[ex.targetReps.length - 1] || ex.targetReps[0] || 1;
+        }
+      });
+    });
+    return parsed;
+  }
+
+  // 요일별로 따로 저장된 세션들을 전부 불러온다. state.routineSessions에
+  // (활성 루틴을 포함해) 전부 채워 넣고, 활성 루틴의 세션을 반환한다.
   function loadSession() {
     try {
       var raw = localStorage.getItem(STORE_SESSION);
       if (raw) {
-        var parsed = JSON.parse(raw);
-        if (parsed && Array.isArray(parsed.parts) && parsed.parts.length) {
-          // 저장된 인덱스가 배열 범위를 벗어나면 currentSessionExercise()가
-          // 부팅 중 renderSession()에서 throw하고, 그러면 buildRecognizer()
-          // 이전이라 free/script 모드까지 전부 죽는다. 방어적으로 clamp한다.
-          var pi = Number(parsed.currentPart);
-          if (!isFinite(pi)) pi = 0;
-          pi = Math.min(Math.max(Math.floor(pi), 0), parsed.parts.length - 1);
-          var part = parsed.parts[pi];
-          if (!part || !Array.isArray(part.exercises) || !part.exercises.length) {
-            return buildInitialSession();
-          }
-          var ei = Number(parsed.currentExercise);
-          if (!isFinite(ei)) ei = 0;
-          ei = Math.min(Math.max(Math.floor(ei), 0), part.exercises.length - 1);
-          parsed.currentPart = pi;
-          parsed.currentExercise = ei;
-          if (!parsed.pendingSubstitute) parsed.pendingSubstitute = null;
-          if (!parsed.routineName || !ROUTINE_LIBRARY[parsed.routineName]) {
-            parsed.routineName = DEFAULT_ROUTINE_NAME;
-          }
-          // 구버전에 저장된 세션엔 setNotes가 없을 수 있고, targetReps가
-          // [최소, 최대] 배열이던 시절 데이터도 있을 수 있다.
-          parsed.parts.forEach(function (p) {
-            p.exercises.forEach(function (ex) {
-              if (!ex.setNotes || typeof ex.setNotes !== "object") ex.setNotes = {};
-              if (Array.isArray(ex.targetReps)) {
-                ex.targetReps = ex.targetReps[ex.targetReps.length - 1] || ex.targetReps[0] || 1;
-              }
-            });
+        var stored = JSON.parse(raw);
+        var sessionsMap = {};
+        var activeName = DEFAULT_ROUTINE_NAME;
+
+        if (stored && stored.sessions && typeof stored.sessions === "object") {
+          // 요일별로 나뉘어 저장된 포맷.
+          if (ROUTINE_LIBRARY[stored.activeRoutineName]) activeName = stored.activeRoutineName;
+          Object.keys(stored.sessions).forEach(function (name) {
+            var norm = normalizeStoredSession(stored.sessions[name]);
+            if (norm) {
+              norm.routineName = name;
+              sessionsMap[name] = norm;
+            }
           });
-          return parsed;
+        } else if (stored && Array.isArray(stored.parts)) {
+          // 루틴을 하나만 저장하던 구버전 포맷 — 그 세션의 루틴 이름(없으면
+          // 기본 루틴)으로 새 포맷에 마이그레이션한다.
+          var norm2 = normalizeStoredSession(stored);
+          if (norm2) {
+            activeName = ROUTINE_LIBRARY[norm2.routineName] ? norm2.routineName : DEFAULT_ROUTINE_NAME;
+            norm2.routineName = activeName;
+            sessionsMap[activeName] = norm2;
+          }
         }
+
+        if (!sessionsMap[activeName]) sessionsMap[activeName] = buildInitialSession(activeName);
+        state.routineSessions = sessionsMap;
+        return sessionsMap[activeName];
       }
     } catch (e) { /* corrupt or unavailable storage: start fresh */ }
-    return buildInitialSession();
+    state.routineSessions = {};
+    return buildInitialSession(DEFAULT_ROUTINE_NAME);
   }
 
   function saveSession() {
     try {
-      localStorage.setItem(STORE_SESSION, JSON.stringify(state.session));
+      var sessions = {};
+      Object.keys(state.routineSessions).forEach(function (name) {
+        sessions[name] = state.routineSessions[name];
+      });
+      sessions[state.session.routineName] = state.session;
+      localStorage.setItem(STORE_SESSION, JSON.stringify({
+        activeRoutineName: state.session.routineName,
+        sessions: sessions
+      }));
     } catch (e) { /* quota or private mode: keep working in memory */ }
   }
 
@@ -1981,12 +2021,18 @@
       ["45파운드 8개", { type: "SET_LOG", weightKg: 20.4, reps: 8 }],
       ["방금 세트 5파운드 더", { type: "SET_ADJUST_WEIGHT", amountKg: 2.3, direction: "add" }],
       ["전체 루틴 보여줘", { type: "ROUTINE_OVERVIEW" }],
-      ["등 운동 뭐 남았어", { type: "PART_REMAINING", partQuery: "등" }],
       ["오버헤드프레스 몇 세트야", { type: "EXERCISE_QUERY", nameQuery: "오버헤드프레스" }],
       ["금요일 루틴 시작", { type: "ROUTINE_SWITCH", routineName: "금요일" }],
       ["목요일 루틴으로 시작해줘", { type: "ROUTINE_SWITCH", routineName: "목요일" }],
       ["아무말 대잔치", { type: "UNRECOGNIZED" }]
     ];
+    // 어느 루틴이 활성 상태든 통하도록, 지금 활성 루틴의 파트 이름으로
+    // PART_REMAINING 케이스를 동적으로 만든다(하드코딩하면 활성 루틴에
+    // 따라 이 테스트만 스푸리어스하게 실패한다).
+    var partNames = currentPartNameList();
+    if (partNames.length) {
+      cases.push([partNames[0] + " 운동 뭐 남았어", { type: "PART_REMAINING", partQuery: partNames[0] }]);
+    }
     var pass = 0, fail = 0, failures = [];
     cases.forEach(function (c) {
       var got = classifyCommand(c[0]);
@@ -2068,6 +2114,7 @@
     scriptGen: 0,
     scriptTimer: null,
     session: null,
+    routineSessions: {}, // 활성 상태가 아닌 요일 루틴들의 저장된 세션 캐시 (이름 -> 세션)
     // 표시 전용(비영속) 배너 상태. renderSession()이 매 렌더마다 배너를
     // 강제로 숨기기 때문에, 배너를 렌더 사이에 살려두려면 state가 필요하다.
     sessionCondMessage: null,  // 컨디션 배너: 다음 종목/다음 컨디션 보고까지 유지
@@ -3432,13 +3479,6 @@
           renderSession();
           return;
         }
-        // 음성 오인식으로 지금까지 기록한 세트를 통째로 날리는 사고를 막는다 —
-        // 기록이 있으면 상단 루틴 선택 메뉴로 직접 확인하고 바꾸게 안내만 한다.
-        if (hasAnyRecordedSets()) {
-          state.sessionSubMessage = "지금 기록된 세트가 있어서 음성으로는 루틴을 못 바꿔요. 화면 위 루틴 선택 메뉴에서 바꿔주세요.";
-          renderSession();
-          return;
-        }
         switchRoutine(matchedName);
         return; // switchRoutine이 자체적으로 save/render 처리
       }
@@ -3734,10 +3774,6 @@
   el.routineSelect.addEventListener("change", function () {
     var name = el.routineSelect.value;
     if (name === state.session.routineName) return;
-    if (hasAnyRecordedSets() && !confirm("'" + name + "' 루틴으로 바꾸면 지금 기록은 사라져요. 바꿀까요?")) {
-      el.routineSelect.value = state.session.routineName;
-      return;
-    }
     switchRoutine(name);
   });
 
