@@ -156,7 +156,7 @@
   /* ---- stats ---- */
   .stats {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(84px, 1fr));
     gap: 1px;
     background: var(--line);
     border: 1px solid var(--line);
@@ -182,6 +182,12 @@
     font-size: 22px;
     font-variant-numeric: tabular-nums;
     font-weight: 600;
+  }
+  .stat .sub {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
   }
 
   /* ---- script mode ---- */
@@ -358,6 +364,20 @@
     text-transform: uppercase;
     color: var(--muted);
     font-variant-numeric: tabular-nums;
+  }
+  .cmd-badge {
+    margin-left: auto;
+    flex: none;
+    padding: 2px 7px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--accent) 16%, transparent);
+    color: var(--accent);
+    letter-spacing: 0.04em;
+    text-transform: none;
+  }
+  .cmd-badge[data-failed="true"] {
+    background: color-mix(in srgb, var(--hot) 16%, transparent);
+    color: var(--hot);
   }
   .entry-text {
     font-size: 17px;

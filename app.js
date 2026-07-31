@@ -657,6 +657,8 @@
     sTotal: document.getElementById("s-total"),
     sOk: document.getElementById("s-ok"),
     sRate: document.getElementById("s-rate"),
+    sCmd: document.getElementById("s-cmd"),
+    sCmdSub: document.getElementById("s-cmd-sub"),
     exportBox: document.getElementById("export"),
     btnExport: document.getElementById("btn-export"),
     btnClear: document.getElementById("btn-clear"),
@@ -775,6 +777,61 @@
     }
   }
 
+  var CMD_LABELS = {
+    SET_LOG: "세트 기록",
+    SET_ADJUST_WEIGHT: "무게 수정",
+    SET_ADJUST_REPS: "횟수 수정",
+    COMMENT: "메모",
+    CONDITION: "컨디션",
+    SUBSTITUTE_REQUEST: "대체 요청",
+    TARGET_ADJUST: "목표 세트",
+    NEXT_EXERCISE: "다음 종목",
+    SESSION_END: "운동 종료",
+    ROUTINE_OVERVIEW: "루틴 보기",
+    ROUTINE_SWITCH: "루틴 전환",
+    PART_REMAINING: "파트 확인",
+    EXERCISE_QUERY: "종목 확인",
+    UNRECOGNIZED: "인식 실패"
+  };
+
+  function sessionCommandEntries() {
+    return state.entries.filter(function (e) { return e.cmdType; });
+  }
+
+  // 현장 인식률 요약 + 실패한 문장 전체 목록. 실패 문장이 곧 파서에서
+  // 다음에 고쳐야 할 목록이라, 요약보다 이 목록이 실제로 더 중요하다.
+  function buildCommandStatsLines() {
+    var cmdEntries = sessionCommandEntries();
+    if (!cmdEntries.length) return [];
+
+    var failed = cmdEntries.filter(function (e) { return e.cmdType === "UNRECOGNIZED"; });
+    var understood = cmdEntries.length - failed.length;
+    var lines = [];
+
+    lines.push("=== 현장 명령 인식률 ===");
+    lines.push("세션 발화 " + cmdEntries.length + "개 중 " + understood + "개 해석 성공 (" +
+      Math.round((understood / cmdEntries.length) * 100) + "%)");
+
+    var byType = {};
+    cmdEntries.forEach(function (e) {
+      if (e.cmdType === "UNRECOGNIZED") return;
+      byType[e.cmdType] = (byType[e.cmdType] || 0) + 1;
+    });
+    Object.keys(byType).sort(function (a, b) { return byType[b] - byType[a]; }).forEach(function (type) {
+      lines.push("  " + (CMD_LABELS[type] || type) + ": " + byType[type]);
+    });
+    lines.push("");
+
+    if (failed.length) {
+      lines.push("=== 인식 실패한 발화 (" + failed.length + "개) ===");
+      failed.forEach(function (e, i) {
+        lines.push((i + 1) + ". " + e.time + " (" + e.condition + ") " + e.text);
+      });
+      lines.push("");
+    }
+    return lines;
+  }
+
   function renderStats() {
     var rated = state.entries.filter(function (e) { return e.verdict; });
     var ok = state.entries.filter(function (e) { return e.verdict === "correct"; });
@@ -783,6 +840,17 @@
     el.sRate.textContent = rated.length
       ? Math.round((ok.length / rated.length) * 100) + "%"
       : "—";
+
+    // 현장 명령 해석률: 세션 모드 발화 중 명령으로 해석된 비율.
+    // 수동 판정이 필요 없어서 그냥 운동하기만 하면 저절로 쌓인다.
+    var cmdEntries = sessionCommandEntries();
+    var understood = cmdEntries.filter(function (e) { return e.cmdType !== "UNRECOGNIZED"; });
+    el.sCmd.textContent = cmdEntries.length
+      ? Math.round((understood.length / cmdEntries.length) * 100) + "%"
+      : "—";
+    el.sCmdSub.textContent = cmdEntries.length
+      ? understood.length + "/" + cmdEntries.length
+      : "세션 모드";
   }
 
   function renderLog() {
@@ -796,7 +864,14 @@
 
       var meta = document.createElement("div");
       meta.className = "entry-meta";
-      meta.textContent = entry.time + " · " + entry.condition;
+      meta.appendChild(document.createTextNode(entry.time + " · " + entry.condition));
+      if (entry.cmdType) {
+        var badge = document.createElement("span");
+        badge.className = "cmd-badge";
+        if (entry.cmdType === "UNRECOGNIZED") badge.setAttribute("data-failed", "true");
+        badge.textContent = CMD_LABELS[entry.cmdType] || entry.cmdType;
+        meta.appendChild(badge);
+      }
       node.appendChild(meta);
 
       var text = document.createElement("div");
@@ -868,11 +943,15 @@
     });
   }
 
-  function addEntry(text) {
+  // meta.cmdType: 세션 모드에서 이 발화가 어떤 명령으로 해석됐는지.
+  // 사람이 따로 판정해주지 않아도 쌓이는 객관적 지표라, 현장 인식률은
+  // 이 값으로 계산한다(verdict는 STT가 단어를 제대로 들었는지에 대한
+  // 수동 판정이라 별개다).
+  function addEntry(text, meta) {
     var trimmed = (text || "").trim();
     if (!trimmed) return;
     var now = new Date();
-    state.entries.push({
+    var entry = {
       id: String(now.getTime()) + Math.random().toString(36).slice(2, 6),
       time: now.toTimeString().slice(0, 8),
       date: now.toISOString(),
@@ -880,7 +959,10 @@
       text: trimmed,
       verdict: null,
       truth: ""
-    });
+    };
+    if (meta && meta.mode) entry.mode = meta.mode;
+    if (meta && meta.cmdType) entry.cmdType = meta.cmdType;
+    state.entries.push(entry);
     save();
     renderLog();
     renderStats();
@@ -1873,6 +1955,12 @@
       });
     }
 
+    var cmdLines = buildCommandStatsLines();
+    if (cmdLines.length) {
+      lines.push("");
+      lines.push.apply(lines, cmdLines);
+    }
+
     var text = lines.join("\n");
     el.exportBox.textContent = text;
     el.exportBox.classList.add("show");
@@ -2001,8 +2089,8 @@
     renderSession();
   }
 
-  function handleSessionCommand(text) {
-    var cmd = classifyCommand(text);
+  function handleSessionCommand(text, preClassified) {
+    var cmd = preClassified || classifyCommand(text);
     var ex = currentSessionExercise();
 
     switch (cmd.type) {
@@ -2135,8 +2223,11 @@
     if (state.mode === "script") {
       handleScriptResult(finalText);
     } else if (state.mode === "session") {
-      addEntry(finalText);
-      handleSessionCommand(finalText);
+      // 한 번만 분류해서 로그와 실행에 같이 쓴다 — 로그에 남은 해석 결과가
+      // 실제로 실행된 것과 어긋나면 인식률 통계가 거짓말을 하게 된다.
+      var cmd = classifyCommand(finalText);
+      addEntry(finalText, { mode: "session", cmdType: cmd.type });
+      handleSessionCommand(finalText, cmd);
     } else {
       addEntry(finalText);
     }
@@ -2477,12 +2568,15 @@
     });
     lines.push("");
 
+    buildCommandStatsLines().forEach(function (l) { lines.push(l); });
+
     lines.push("=== 전체 발화 ===");
     state.entries.forEach(function (e, i) {
       var mark = e.verdict === "correct" ? "O" : (e.verdict === "wrong" ? "X" : "-");
       lines.push((i + 1) + ". [" + mark + "] " + e.time + " (" + e.condition + ")");
       if (e.expected) lines.push("   기대: " + e.expected);
       lines.push("   인식: " + e.text);
+      if (e.cmdType) lines.push("   해석: " + (CMD_LABELS[e.cmdType] || e.cmdType));
     });
     var text = lines.join("\n");
     el.exportBox.textContent = text;
