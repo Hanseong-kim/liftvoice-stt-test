@@ -533,13 +533,18 @@
     border-bottom: 1px solid var(--line);
     margin-bottom: 2px;
   }
-  .session-elapsed {
-    font-family: var(--font-mono);
-    font-variant-numeric: tabular-nums;
-    color: var(--muted);
-    margin-left: auto;
+  .routine-select {
+    font: inherit;
+    font-size: 13px;
+    font-weight: 650;
+    padding: 8px 10px;
+    min-height: 40px;
+    border-radius: 8px;
+    border: 1px solid var(--line);
+    background: none;
+    color: inherit;
+    margin-right: auto;
   }
-  .session-start-btn,
   .session-end-btn {
     font: inherit;
     font-size: 13px;
@@ -549,30 +554,9 @@
     border-radius: 8px;
     cursor: pointer;
     flex: none;
-  }
-  .session-start-btn {
-    border: 1px solid var(--good);
-    background: none;
-    color: var(--good);
-  }
-  .session-start-btn[hidden],
-  .session-end-btn[hidden] { display: none; }
-  .session-end-btn {
     border: 1px solid var(--hot);
     background: none;
     color: var(--hot);
-  }
-  .session-reset-btn {
-    font: inherit;
-    font-size: 12px;
-    padding: 6px 10px;
-    min-height: 34px;
-    border-radius: 8px;
-    border: 1px solid var(--line);
-    background: none;
-    color: var(--muted);
-    cursor: pointer;
-    flex: none;
   }
 
   /* ---- routine overlay ---- */
@@ -1190,6 +1174,7 @@
 
   <div class="script-panel" id="session-panel">
     <div class="session-workout-bar">
+      <select class="routine-select" id="routine-select" aria-label="루틴 선택"></select>
       <button class="session-end-btn" type="button" id="btn-session-end">■ 운동 종료</button>
     </div>
     <div class="script-meta">
@@ -1421,6 +1406,10 @@
           <div class="cmd-example">오버헤드프레스 몇 세트야</div>
           <div class="cmd-desc">해당 종목 상세로 전체 루틴 패널 열기</div>
         </div>
+        <div class="cmd-item">
+          <div class="cmd-example">금요일 루틴 시작 / 목요일 루틴으로 시작해줘</div>
+          <div class="cmd-desc">저장된 다른 요일 루틴으로 전환 (지금 기록된 세트가 있으면 확인 후 새로 시작)</div>
+        </div>
       </div>
 
       <div class="cmd-group">
@@ -1537,12 +1526,14 @@
     if (focusBtn) focusBtn.setAttribute("aria-pressed", tweaks.focus ? "true" : "false");
   }
 
-  function buildInitialSession() {
+  function buildInitialSession(routineName) {
+    var name = ROUTINE_LIBRARY[routineName] ? routineName : DEFAULT_ROUTINE_NAME;
     return {
+      routineName: name,
       currentPart: 0,
       currentExercise: 0,
       pendingSubstitute: null,
-      parts: SESSION_ROUTINE.map(function (part) {
+      parts: routinePartsFor(name).map(function (part) {
         return {
           name: part.name,
           exercises: part.exercises.map(function (ex) {
@@ -1551,7 +1542,7 @@
               name: ex.name,
               isMain: ex.isMain,
               targetSets: ex.targetSets,
-              targetReps: ex.targetReps.slice(),
+              targetReps: ex.targetReps,
               restSec: ex.restSec,
               sets: [],
               comments: [],
@@ -1562,6 +1553,21 @@
         };
       })
     };
+  }
+
+  // 사용자가 다른 요일 루틴으로 전환할 때 쓴다 — 지금 세션은 통째로 새
+  // 루틴 템플릿으로 교체된다(기록된 세트는 사라지므로 호출 전에 확인 필요).
+  function switchRoutine(routineName) {
+    state.session = buildInitialSession(routineName);
+    state.session.pendingSubstitute = null;
+    state.sessionCondMessage = null;
+    state.sessionSubMessage = null;
+    state.routineExpandedId = null;
+    state.routineAddingPart = null;
+    state.editingSetKey = null;
+    stopRestCountdown();
+    saveSession();
+    renderSession();
   }
 
   function loadSession() {
@@ -1586,10 +1592,17 @@
           parsed.currentPart = pi;
           parsed.currentExercise = ei;
           if (!parsed.pendingSubstitute) parsed.pendingSubstitute = null;
-          // 구버전에 저장된 세션엔 setNotes가 없을 수 있다.
+          if (!parsed.routineName || !ROUTINE_LIBRARY[parsed.routineName]) {
+            parsed.routineName = DEFAULT_ROUTINE_NAME;
+          }
+          // 구버전에 저장된 세션엔 setNotes가 없을 수 있고, targetReps가
+          // [최소, 최대] 배열이던 시절 데이터도 있을 수 있다.
           parsed.parts.forEach(function (p) {
             p.exercises.forEach(function (ex) {
               if (!ex.setNotes || typeof ex.setNotes !== "object") ex.setNotes = {};
+              if (Array.isArray(ex.targetReps)) {
+                ex.targetReps = ex.targetReps[ex.targetReps.length - 1] || ex.targetReps[0] || 1;
+              }
             });
           });
           return parsed;
@@ -1628,27 +1641,75 @@
     "플랭크 60초"
   ];
 
-  var SESSION_ROUTINE = [
-    {
-      name: "어깨",
-      exercises: [
-        { id: "overhead_press", name: "오버헤드프레스", isMain: true, targetSets: 4, targetReps: [6, 8], restSec: 120 },
-        { id: "lateral_raise", name: "사이드 레터럴 레이즈", isMain: false, targetSets: 4, targetReps: [12, 15], restSec: 60 },
-        { id: "face_pull", name: "페이스풀/리어델트", isMain: false, targetSets: 3, targetReps: [15, 15], restSec: 60 }
-      ]
-    },
-    {
-      name: "등",
-      exercises: [
-        { id: "pullup", name: "풀업", isMain: false, targetSets: 4, targetReps: [6, 10], restSec: 120 },
-        { id: "barbell_row", name: "바벨/덤벨로우", isMain: false, targetSets: 4, targetReps: [8, 10], restSec: 90 },
-        { id: "lat_pulldown", name: "랫풀다운", isMain: false, targetSets: 4, targetReps: [10, 12], restSec: 75 },
-        { id: "seated_cable_row", name: "시티드 케이블 로우", isMain: false, targetSets: 3, targetReps: [12, 12], restSec: 60 }
-      ]
-    }
-  ];
+  var DEFAULT_ROUTINE_NAME = "목요일";
 
-  var PART_NAME_LIST = SESSION_ROUTINE.map(function (p) { return p.name; });
+  // 요일별로 따로 저장된 루틴들. 세션을 새로 시작할 때 이 중 하나를
+  // 템플릿으로 골라서 state.session.parts를 채운다(실제 진행 상태는
+  // 세션 시작 이후 여기와 별개로 저장된다).
+  var ROUTINE_LIBRARY = {
+    "목요일": [
+      {
+        name: "어깨",
+        exercises: [
+          { id: "dumbbell_shoulder_press", name: "덤벨 숄더프레스", isMain: true, targetSets: 4, targetReps: 10, restSec: 120 },
+          { id: "face_pull", name: "페이스풀/리어델트", isMain: false, targetSets: 2, targetReps: 20, restSec: 60 },
+          { id: "lateral_raise", name: "사이드 레터럴 레이즈", isMain: false, targetSets: 4, targetReps: 20, restSec: 60 }
+        ]
+      },
+      {
+        name: "등",
+        exercises: [
+          { id: "pulldown", name: "풀다운", isMain: false, targetSets: 4, targetReps: 10, restSec: 90 },
+          { id: "tbar_row", name: "티바로우", isMain: false, targetSets: 5, targetReps: 10, restSec: 90 },
+          { id: "high_row", name: "하이로우", isMain: false, targetSets: 3, targetReps: 10, restSec: 75 },
+          { id: "lat_pulldown", name: "랫풀다운", isMain: true, targetSets: 4, targetReps: 10, restSec: 90 },
+          { id: "one_arm_row", name: "원암 덤벨로우", isMain: false, targetSets: 3, targetReps: 10, restSec: 75 },
+          { id: "seated_cable_row", name: "시티드 케이블 로우", isMain: false, targetSets: 3, targetReps: 12, restSec: 60 }
+        ]
+      }
+    ],
+    "금요일": [
+      {
+        name: "데드리프트",
+        exercises: [
+          { id: "deadlift_warmup1", name: "데드리프트 웜업1", isMain: false, targetSets: 1, targetReps: 5, restSec: 90 },
+          { id: "deadlift_warmup2", name: "데드리프트 웜업2", isMain: false, targetSets: 1, targetReps: 3, restSec: 120 },
+          { id: "deadlift_warmup3", name: "데드리프트 웜업3", isMain: false, targetSets: 1, targetReps: 1, restSec: 150 },
+          { id: "deadlift_top_single", name: "데드리프트 Top Single", isMain: true, targetSets: 2, targetReps: 1, restSec: 180 }
+        ]
+      },
+      {
+        name: "승모근 보조",
+        exercises: [
+          { id: "dumbbell_shrug", name: "덤벨 슈러그", isMain: false, targetSets: 3, targetReps: 15, restSec: 60 }
+        ]
+      },
+      {
+        name: "코어 & 복근",
+        exercises: [
+          { id: "hanging_leg_raise", name: "행잉 레그레이즈", isMain: false, targetSets: 3, targetReps: 15, restSec: 60 },
+          { id: "lying_leg_raise", name: "라잉 레그레이즈", isMain: false, targetSets: 3, targetReps: 20, restSec: 60 }
+        ]
+      },
+      {
+        name: "팔 보조",
+        exercises: [
+          { id: "cable_triceps_pushdown", name: "케이블 트라이셉 푸쉬다운", isMain: false, targetSets: 3, targetReps: 15, restSec: 60 },
+          { id: "ez_bar_curl", name: "EZ바 컬/덤벨 해머컬", isMain: false, targetSets: 3, targetReps: 15, restSec: 60 }
+        ]
+      }
+    ]
+  };
+
+  var ROUTINE_NAME_LIST = Object.keys(ROUTINE_LIBRARY);
+
+  function routinePartsFor(routineName) {
+    return ROUTINE_LIBRARY[routineName] || ROUTINE_LIBRARY[DEFAULT_ROUTINE_NAME];
+  }
+
+  function currentPartNameList() {
+    return routinePartsFor(state.session && state.session.routineName).map(function (p) { return p.name; });
+  }
 
   var NUM_WORDS = {
     "영": "0", "공": "0", "하나": "1", "한": "1", "일": "1", "둘": "2", "두": "2", "이": "2",
@@ -1814,7 +1875,12 @@
       return { type: "ROUTINE_OVERVIEW" };
     }
 
-    var partRemainRe = new RegExp("(" + PART_NAME_LIST.join("|") + ")\\s*(?:운동)?\\s*(?:은|는)?\\s*(?:뭐가?\\s*남았|얼마나\\s*남았|남은\\s*거)");
+    var routineSwitchMatch = text.match(/^(.+?)\s*루틴(?:으로)?\s*시작(?:할래|해줘|하자)?$/);
+    if (routineSwitchMatch) {
+      return { type: "ROUTINE_SWITCH", routineName: routineSwitchMatch[1].trim() };
+    }
+
+    var partRemainRe = new RegExp("(" + currentPartNameList().join("|") + ")\\s*(?:운동)?\\s*(?:은|는)?\\s*(?:뭐가?\\s*남았|얼마나\\s*남았|남은\\s*거)");
     var partRemainMatch = text.match(partRemainRe);
     if (partRemainMatch) {
       return { type: "PART_REMAINING", partQuery: partRemainMatch[1] };
@@ -1917,6 +1983,8 @@
       ["전체 루틴 보여줘", { type: "ROUTINE_OVERVIEW" }],
       ["등 운동 뭐 남았어", { type: "PART_REMAINING", partQuery: "등" }],
       ["오버헤드프레스 몇 세트야", { type: "EXERCISE_QUERY", nameQuery: "오버헤드프레스" }],
+      ["금요일 루틴 시작", { type: "ROUTINE_SWITCH", routineName: "금요일" }],
+      ["목요일 루틴으로 시작해줘", { type: "ROUTINE_SWITCH", routineName: "목요일" }],
       ["아무말 대잔치", { type: "UNRECOGNIZED" }]
     ];
     var pass = 0, fail = 0, failures = [];
@@ -1968,6 +2036,7 @@
     sessionNextSet: document.getElementById("session-next-set"),
     sessionTargetSetsInput: document.getElementById("session-target-sets-input"),
     sessionRestInput: document.getElementById("session-rest-input"),
+    routineSelect: document.getElementById("routine-select"),
     btnSessionEnd: document.getElementById("btn-session-end"),
     sessionRestTimer: document.getElementById("session-rest-timer"),
     sessionLog: document.getElementById("session-log"),
@@ -2200,9 +2269,25 @@
     return part.exercises[state.session.currentExercise];
   }
 
+  function renderRoutineSelect() {
+    if (!el.routineSelect) return;
+    if (el.routineSelect.options.length !== ROUTINE_NAME_LIST.length) {
+      el.routineSelect.innerHTML = "";
+      ROUTINE_NAME_LIST.forEach(function (name) {
+        var opt = document.createElement("option");
+        opt.value = name;
+        opt.textContent = name;
+        el.routineSelect.appendChild(opt);
+      });
+    }
+    el.routineSelect.value = state.session.routineName;
+  }
+
   function renderSession() {
     el.sessionPanel.classList.toggle("show", state.mode === "session");
     if (state.mode !== "session") return;
+
+    renderRoutineSelect();
 
     var part = state.session.parts[state.session.currentPart];
     var ex = currentSessionExercise();
@@ -2212,17 +2297,14 @@
       (state.session.currentExercise + 1) + " / " + part.exercises.length + " 종목";
     el.sessionExerciseName.textContent = ex.name;
 
-    var repsLabel = ex.targetReps[0] === ex.targetReps[1]
-      ? String(ex.targetReps[0])
-      : ex.targetReps[0] + "~" + ex.targetReps[1];
     el.sessionTarget.textContent =
-      "목표 " + ex.targetSets + "세트 × " + repsLabel + "회 · " + ex.sets.length + "/" + ex.targetSets;
+      "목표 " + ex.targetSets + "세트 × " + ex.targetReps + "회 · " + ex.sets.length + "/" + ex.targetSets;
 
     if (ex.sets.length >= ex.targetSets) {
       el.sessionNextSet.textContent = "완료 · 목표 세트 다 채웠어요 — \"다음 종목\"이라고 말해보세요";
     } else {
       el.sessionNextSet.textContent =
-        "▶ 진행중 · " + part.name + " · " + ex.name + " · " + (ex.sets.length + 1) + "번째 세트 (" + repsLabel + "회 목표)";
+        "▶ 진행중 · " + part.name + " · " + ex.name + " · " + (ex.sets.length + 1) + "번째 세트 (" + ex.targetReps + "회 목표)";
     }
 
     // 사용자가 지금 이 입력칸에 타이핑 중이면 렌더가 값을 덮어쓰지 않게 한다.
@@ -2358,12 +2440,9 @@
 
         attachExerciseDrag(handle, card, pIdx, list);
 
-        var repsLabel = ex.targetReps[0] === ex.targetReps[1]
-          ? String(ex.targetReps[0])
-          : ex.targetReps[0] + "~" + ex.targetReps[1];
         var sub = document.createElement("div");
         sub.className = "routine-ex-sub";
-        sub.textContent = ex.targetSets + "세트 × " + repsLabel + "회 · " + ex.sets.length + "/" + ex.targetSets + " 완료" +
+        sub.textContent = ex.targetSets + "세트 × " + ex.targetReps + "회 · " + ex.sets.length + "/" + ex.targetSets + " 완료" +
           (ex.substitutedFrom ? " · 대체됨 (" + ex.substitutedFrom + " → " + ex.name + ")" : "");
         card.appendChild(sub);
 
@@ -2377,7 +2456,7 @@
           tlbl.className = "lbl";
           tlbl.textContent = "목표";
           target.appendChild(tlbl);
-          target.appendChild(document.createTextNode(ex.targetSets + "세트 × " + repsLabel + "회"));
+          target.appendChild(document.createTextNode(ex.targetSets + "세트 × " + ex.targetReps + "회"));
           detail.appendChild(target);
 
           var restInfo = document.createElement("div");
@@ -2612,7 +2691,7 @@
       name: data.name,
       isMain: false,
       targetSets: data.targetSets,
-      targetReps: [data.repsMin, data.repsMax],
+      targetReps: data.reps,
       restSec: data.restSec,
       sets: [],
       comments: [],
@@ -2676,12 +2755,10 @@
     var row = document.createElement("div");
     row.className = "routine-add-form-row";
     var setsInput = numField("세트", 3);
-    var repsMinInput = numField("반복(최소)", 8, true);
-    var repsMaxInput = numField("반복(최대)", 12, true);
+    var repsInput = numField("반복", 10, true);
     var restInput = numField("휴식(초)", 90);
     row.appendChild(setsInput);
-    row.appendChild(repsMinInput);
-    row.appendChild(repsMaxInput);
+    row.appendChild(repsInput);
     row.appendChild(restInput);
     form.appendChild(row);
 
@@ -2699,16 +2776,13 @@
       var sets = parseInt(setsInput.value, 10);
       if (isNaN(sets) || sets < 1) sets = 1;
 
-      var repsMin = parseInt(repsMinInput.value, 10);
-      if (isNaN(repsMin) || repsMin < 1) repsMin = 1;
-
-      var repsMax = parseInt(repsMaxInput.value, 10);
-      if (isNaN(repsMax) || repsMax < repsMin) repsMax = repsMin;
+      var reps = parseInt(repsInput.value, 10);
+      if (isNaN(reps) || reps < 1) reps = 1;
 
       var rest = parseInt(restInput.value, 10);
       if (isNaN(rest) || rest < 0) rest = 90;
 
-      addCustomExercise(partIdx, { name: name, targetSets: sets, repsMin: repsMin, repsMax: repsMax, restSec: rest });
+      addCustomExercise(partIdx, { name: name, targetSets: sets, reps: reps, restSec: rest });
     });
 
     var cancelBtn = document.createElement("button");
@@ -2823,7 +2897,7 @@
       repsInput.className = "set-num-input set-reps-input";
       repsInput.setAttribute("data-set-key", String(i));
       repsInput.placeholder = "회수";
-      repsInput.value = doneSet ? doneSet.reps : ex.targetReps[0];
+      repsInput.value = doneSet ? doneSet.reps : ex.targetReps;
       fields.appendChild(repsInput);
 
       var repsUnit = document.createElement("span");
@@ -2925,7 +2999,7 @@
       var num = parseFloat(input.value);
       if (!isNaN(num)) return field === "reps" ? Math.round(num) : toStoredKg(num);
     }
-    if (field === "reps") return ex.targetReps[0];
+    if (field === "reps") return ex.targetReps;
     var prev = ex.sets[ex.sets.length - 1];
     return prev ? prev.weight : 0;
   }
@@ -3346,6 +3420,28 @@
         }
         return;
       }
+      case "ROUTINE_SWITCH": {
+        var matchedName = ROUTINE_NAME_LIST.filter(function (n) { return n === cmd.routineName; })[0];
+        if (!matchedName) {
+          state.sessionSubMessage = "'" + cmd.routineName + "' 루틴을 찾지 못했어요. (저장된 루틴: " + ROUTINE_NAME_LIST.join(", ") + ")";
+          renderSession();
+          return;
+        }
+        if (matchedName === state.session.routineName) {
+          state.sessionSubMessage = "이미 '" + matchedName + "' 루틴이에요.";
+          renderSession();
+          return;
+        }
+        // 음성 오인식으로 지금까지 기록한 세트를 통째로 날리는 사고를 막는다 —
+        // 기록이 있으면 상단 루틴 선택 메뉴로 직접 확인하고 바꾸게 안내만 한다.
+        if (hasAnyRecordedSets()) {
+          state.sessionSubMessage = "지금 기록된 세트가 있어서 음성으로는 루틴을 못 바꿔요. 화면 위 루틴 선택 메뉴에서 바꿔주세요.";
+          renderSession();
+          return;
+        }
+        switchRoutine(matchedName);
+        return; // switchRoutine이 자체적으로 save/render 처리
+      }
       case "SESSION_END":
         endWorkoutSession();
         return;
@@ -3634,6 +3730,16 @@
   });
 
   el.btnSessionEnd.addEventListener("click", endWorkoutSession);
+
+  el.routineSelect.addEventListener("change", function () {
+    var name = el.routineSelect.value;
+    if (name === state.session.routineName) return;
+    if (hasAnyRecordedSets() && !confirm("'" + name + "' 루틴으로 바꾸면 지금 기록은 사라져요. 바꿀까요?")) {
+      el.routineSelect.value = state.session.routineName;
+      return;
+    }
+    switchRoutine(name);
+  });
 
   el.btnRoutineClose.addEventListener("click", closeRoutineOverlay);
   el.routineBackdrop.addEventListener("click", closeRoutineOverlay);
