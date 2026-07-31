@@ -1467,6 +1467,15 @@
   function toStoredKg(displayVal) { return tweaks.unit === "lb" ? lbToKgVal(displayVal) : displayVal; }
   function weightUnitLabel() { return tweaks.unit === "lb" ? "lb" : "kg"; }
 
+  // 모바일 number input엔 PC 스피너(위아래 화살표)가 없어서 값을 바꾸려면
+  // 기존 숫자를 지우고 다시 입력해야 한다. 탭하면 바로 비워서 그냥 새
+  // 숫자를 치면 되게 한다.
+  function clearOnFocus(input) {
+    input.addEventListener("focus", function () {
+      input.value = "";
+    });
+  }
+
   function loadTweaks() {
     try {
       var raw = localStorage.getItem(STORE_TWEAKS);
@@ -2255,9 +2264,7 @@
         renderStats();
       });
 
-      input.addEventListener("focus", function () {
-        input.value = "";
-      });
+      clearOnFocus(input);
 
       input.addEventListener("input", function () {
         entry.truth = input.value;
@@ -2796,6 +2803,7 @@
       inp.placeholder = placeholder;
       inp.value = String(value);
       if (small) inp.className = "routine-add-form-input-sm";
+      clearOnFocus(inp);
       return inp;
     }
 
@@ -2930,6 +2938,7 @@
       weightInput.setAttribute("data-set-key", String(i));
       weightInput.placeholder = weightUnitLabel();
       weightInput.value = doneSet ? displayWeight(doneSet.weight) : (lastKnown ? displayWeight(lastKnown.weight) : "");
+      clearOnFocus(weightInput);
       fields.appendChild(weightInput);
 
       var kgTimes = document.createElement("span");
@@ -2945,6 +2954,7 @@
       repsInput.setAttribute("data-set-key", String(i));
       repsInput.placeholder = "회수";
       repsInput.value = doneSet ? doneSet.reps : ex.targetReps;
+      clearOnFocus(repsInput);
       fields.appendChild(repsInput);
 
       var repsUnit = document.createElement("span");
@@ -3748,6 +3758,9 @@
   el.btnRoutineOverview.addEventListener("click", function () {
     openRoutineOverlay();
   });
+
+  clearOnFocus(el.sessionRestInput);
+  clearOnFocus(el.sessionTargetSetsInput);
 
   el.sessionRestInput.addEventListener("change", function () {
     var ex = currentSessionExercise();
