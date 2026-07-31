@@ -1190,10 +1190,7 @@
 
   <div class="script-panel" id="session-panel">
     <div class="session-workout-bar">
-      <button class="session-start-btn" type="button" id="btn-session-start">▶ 운동 시작</button>
       <button class="session-end-btn" type="button" id="btn-session-end">■ 운동 종료</button>
-      <span class="session-elapsed" id="session-elapsed"></span>
-      <button class="session-reset-btn" type="button" id="btn-session-reset" title="운동 시간만 0으로 초기화 (기록된 세트는 그대로)">⟲ 시간 초기화</button>
     </div>
     <div class="script-meta">
       <span id="session-part-name">어깨</span>
@@ -1481,15 +1478,6 @@
   function toStoredKg(displayVal) { return tweaks.unit === "lb" ? lbToKgVal(displayVal) : displayVal; }
   function weightUnitLabel() { return tweaks.unit === "lb" ? "lb" : "kg"; }
 
-  function formatDuration(ms) {
-    var totalSec = Math.max(0, Math.floor(ms / 1000));
-    var h = Math.floor(totalSec / 3600);
-    var m = Math.floor((totalSec % 3600) / 60);
-    var s = totalSec % 60;
-    function pad(n) { return n < 10 ? "0" + n : String(n); }
-    return h > 0 ? (h + ":" + pad(m) + ":" + pad(s)) : (pad(m) + ":" + pad(s));
-  }
-
   function loadTweaks() {
     try {
       var raw = localStorage.getItem(STORE_TWEAKS);
@@ -1554,8 +1542,6 @@
       currentPart: 0,
       currentExercise: 0,
       pendingSubstitute: null,
-      startedAt: null, // 첫 세트 기록 시점(ms epoch) — 이때 운동 시간 측정 시작
-      endedAt: null,   // "운동 종료" 누른 시점(ms epoch)
       parts: SESSION_ROUTINE.map(function (part) {
         return {
           name: part.name,
@@ -1600,8 +1586,6 @@
           parsed.currentPart = pi;
           parsed.currentExercise = ei;
           if (!parsed.pendingSubstitute) parsed.pendingSubstitute = null;
-          if (typeof parsed.startedAt !== "number") parsed.startedAt = null;
-          if (typeof parsed.endedAt !== "number") parsed.endedAt = null;
           // 구버전에 저장된 세션엔 setNotes가 없을 수 있다.
           parsed.parts.forEach(function (p) {
             p.exercises.forEach(function (ex) {
@@ -1694,7 +1678,7 @@
   function normalize(text) {
     var s = String(text == null ? "" : text).toLowerCase();
     s = stripPunctuation(s);
-    s = s.replace(/kg|킬로그램|킬로|키로/g, "키로");
+    s = s.replace(/kg|km|킬로그램|킬로|키로/g, "키로");
     s = s.replace(/lbs|lb|파운드/g, "파운드");
     s = s.replace(/초간|초동안/g, "초");
     var parts = s.split(/\s+/).filter(function (w) { return w.length > 0; });
@@ -1778,7 +1762,7 @@
   function wordsToDigitString(text) {
     var s = String(text == null ? "" : text).toLowerCase();
     s = stripPunctuation(s);
-    s = s.replace(/kg|킬로그램|킬로|키로/g, "키로");
+    s = s.replace(/kg|km|킬로그램|킬로|키로/g, "키로");
     s = s.replace(/lbs|lb|파운드/g, "파운드");
     s = s.replace(/초간|초동안/g, "초");
     var words = s.split(/\s+/).filter(function (w) { return w.length > 0; });
@@ -1982,12 +1966,9 @@
     sessionExerciseName: document.getElementById("session-exercise-name"),
     sessionTarget: document.getElementById("session-target"),
     sessionNextSet: document.getElementById("session-next-set"),
-    sessionElapsed: document.getElementById("session-elapsed"),
     sessionTargetSetsInput: document.getElementById("session-target-sets-input"),
     sessionRestInput: document.getElementById("session-rest-input"),
-    btnSessionStart: document.getElementById("btn-session-start"),
     btnSessionEnd: document.getElementById("btn-session-end"),
-    btnSessionReset: document.getElementById("btn-session-reset"),
     sessionRestTimer: document.getElementById("session-rest-timer"),
     sessionLog: document.getElementById("session-log"),
     sessionSubBanner: document.getElementById("session-sub-banner"),
@@ -2027,8 +2008,7 @@
     routineAddingPart: null,   // 종목 추가 폼이 열려 있는 파트 인덱스(비영속)
     editingSetKey: null,       // 메모 입력 중인 세트 인덱스(문자열, 비영속)
     restEndsAt: null,          // 휴식 타이머 종료 시각(ms epoch, 비영속)
-    restIntervalId: null,      // 휴식 타이머 setInterval id
-    elapsedIntervalId: null    // 총 운동 시간 갱신 setInterval id (비영속)
+    restIntervalId: null       // 휴식 타이머 setInterval id
   };
 
   var rec = null;
@@ -2159,6 +2139,10 @@
         renderStats();
       });
 
+      input.addEventListener("focus", function () {
+        input.value = "";
+      });
+
       input.addEventListener("input", function () {
         entry.truth = input.value;
         save();
@@ -2249,10 +2233,6 @@
       el.sessionTargetSetsInput.value = ex.targetSets;
     }
 
-    var workoutActive = !!state.session.startedAt && !state.session.endedAt;
-    el.btnSessionStart.hidden = workoutActive;
-    el.btnSessionEnd.hidden = !workoutActive;
-    renderElapsed();
     renderRestTimer();
     renderSetPlan(ex);
 
@@ -3032,7 +3012,6 @@
 
     if (action === "complete") {
       var row = btn.closest(".session-set");
-      markSessionStarted();
       commitSetRowData(row);
       startRestCountdown(ex.restSec || 90);
       renderSession();
@@ -3090,61 +3069,20 @@
     el.sessionRestTimer.textContent = restCountdownText(remaining);
   }
 
-  // 전체 운동(세션) 단위의 시작 시각을 못박는다 — 특정 종목이 아니라 오늘 세션 전체.
-  // 아직 한 번도 시작 안 했거나, 이전에 종료했다가 다시 세트를 기록하는 경우
-  // 둘 다 여기서 처리한다(재시작 시 시계는 0부터 다시 잰다).
-  function markSessionStarted() {
-    if (!state.session.startedAt || state.session.endedAt) {
-      state.session.startedAt = Date.now();
-      state.session.endedAt = null;
-      saveSession();
-      startElapsedTicker();
-    }
-  }
-
-  function startElapsedTicker() {
-    clearInterval(state.elapsedIntervalId);
-    renderElapsed();
-    state.elapsedIntervalId = setInterval(renderElapsed, 1000);
-  }
-
-  function stopElapsedTicker() {
-    clearInterval(state.elapsedIntervalId);
-    state.elapsedIntervalId = null;
-  }
-
-  function renderElapsed() {
-    if (!el.sessionElapsed) return;
-    if (!state.session.startedAt) {
-      el.sessionElapsed.textContent = "";
-      return;
-    }
-    var end = state.session.endedAt || Date.now();
-    el.sessionElapsed.textContent = "⏱ " + formatDuration(end - state.session.startedAt);
+  function hasAnyRecordedSets() {
+    return state.session.parts.some(function (part) {
+      return part.exercises.some(function (ex) { return ex.sets.length > 0; });
+    });
   }
 
   // 운동 종료 버튼과 음성/텍스트 "오늘 끝" 명령이 공유하는 단일 종료 경로.
   function endWorkoutSession() {
-    if (!state.session.startedAt) {
+    if (!hasAnyRecordedSets()) {
       state.sessionSubMessage = "아직 기록된 세트가 없어서 종료할 게 없어요.";
       renderSession();
       return;
     }
-    state.session.endedAt = Date.now();
-    stopElapsedTicker();
-    renderElapsed();
-    saveSession();
     renderSessionSummaryExport();
-  }
-
-  // 시간만 0으로 되돌린다 — 기록된 세트·메모는 전혀 건드리지 않는다.
-  // 실수로 너무 일찍 시작했거나 시간 측정을 다시 하고 싶을 때 쓴다.
-  function resetWorkoutTimer() {
-    state.session.startedAt = null;
-    state.session.endedAt = null;
-    stopElapsedTicker();
-    saveSession();
-    renderSession();
   }
 
   // 세트 메모·종목 메모·아직 완료 안 한 세트에 예약된 메모까지 전부 모아서,
@@ -3176,11 +3114,6 @@
     var lines = [];
     var dateLabel = new Date().toISOString().slice(0, 10);
     lines.push("LiftVoice 세션 요약 — " + dateLabel);
-
-    if (state.session.startedAt) {
-      var end = state.session.endedAt || Date.now();
-      lines.push("총 운동 시간: " + formatDuration(end - state.session.startedAt));
-    }
     lines.push("");
 
     var totalSets = 0;
@@ -3422,8 +3355,10 @@
           var prevSet = ex.sets[ex.sets.length - 1];
           weight = prevSet ? prevSet.weight : null;
         }
-        if (weight == null) return; // 첫 세트에서 무게를 안 말하면 조용히 무시
-        markSessionStarted();
+        if (weight == null) {
+          state.sessionSubMessage = "이 종목 첫 세트는 무게도 말해주세요 (예: \"45키로 8개\").";
+          break;
+        }
         var newSet = { weight: weight, reps: cmd.reps, ts: new Date().toISOString() };
         var pendingNoteForNewSet = takePendingNote(ex, ex.sets.length);
         if (pendingNoteForNewSet) newSet.comment = pendingNoteForNewSet;
@@ -3698,12 +3633,7 @@
     renderSession();
   });
 
-  el.btnSessionStart.addEventListener("click", function () {
-    markSessionStarted();
-    renderSession();
-  });
   el.btnSessionEnd.addEventListener("click", endWorkoutSession);
-  el.btnSessionReset.addEventListener("click", resetWorkoutTimer);
 
   el.btnRoutineClose.addEventListener("click", closeRoutineOverlay);
   el.routineBackdrop.addEventListener("click", closeRoutineOverlay);
@@ -3854,7 +3784,6 @@
   renderStats();
   renderScript();
   renderSession();
-  if (state.session.startedAt && !state.session.endedAt) startElapsedTicker();
 
   document.getElementById("tweaks-toggle").addEventListener("click", function () {
     document.getElementById("tweaks-panel").classList.add("show");
