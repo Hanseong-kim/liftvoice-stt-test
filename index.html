@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<title>LiftVoice STT 현장 테스트</title>
+<title>LiftVoice — 오늘 루틴</title>
 
 <link rel="stylesheet" href="styles.css">
 </head>
@@ -13,30 +13,11 @@
 <div class="wrap">
 
   <div class="head">
-    <div class="eyebrow">LiftVoice · 검증 1</div>
-    <h1>헬스장 소음 한국어 인식 테스트</h1>
+    <div class="eyebrow">LiftVoice</div>
+    <h1>오늘 루틴</h1>
   </div>
 
-  <div class="chips" id="modes">
-    <button class="chip" type="button" data-m="free" aria-pressed="true">자유 발화</button>
-    <button class="chip" type="button" data-m="script" aria-pressed="false">스크립트 측정</button>
-    <button class="chip" type="button" data-m="session" aria-pressed="false">실전 세션</button>
-  </div>
-
-  <div class="script-panel" id="script-panel">
-    <div class="script-meta">
-      <span id="script-progress">1 / 20</span>
-      <button class="skip" type="button" id="btn-skip">건너뛰기</button>
-    </div>
-    <div class="script-line" id="script-line"></div>
-    <div class="script-result" id="script-result"></div>
-    <div class="script-actions" id="script-actions">
-      <button class="vbtn no" type="button" id="btn-misheard">오인식</button>
-      <button class="vbtn" type="button" id="btn-misread">내가 잘못 읽음</button>
-    </div>
-  </div>
-
-  <div class="script-panel" id="session-panel">
+  <div class="script-panel show" id="session-panel">
     <div class="session-workout-bar">
       <select class="routine-select" id="routine-select" aria-label="루틴 선택"></select>
       <button class="session-end-btn" type="button" id="btn-session-end">■ 운동 종료</button>
@@ -74,42 +55,13 @@
 
   <div class="banner" id="banner"></div>
 
-  <div>
-    <div class="field-label">측정 환경</div>
-    <div class="chips" id="conds">
-      <button class="chip" type="button" data-c="조용" aria-pressed="true">조용</button>
-      <button class="chip" type="button" data-c="헬스장" aria-pressed="false">헬스장</button>
-      <button class="chip" type="button" data-c="기구소음 근처" aria-pressed="false">기구소음 근처</button>
-    </div>
-  </div>
-
-  <div class="stats">
-    <div class="stat">
-      <div class="k">발화</div>
-      <div class="v" id="s-total">0</div>
-    </div>
-    <div class="stat">
-      <div class="k">정확</div>
-      <div class="v" id="s-ok">0</div>
-    </div>
-    <div class="stat">
-      <div class="k">인식률</div>
-      <div class="v" id="s-rate">—</div>
-    </div>
-    <div class="stat">
-      <div class="k">명령 해석</div>
-      <div class="v" id="s-cmd">—</div>
-      <div class="sub" id="s-cmd-sub">세션 모드</div>
-    </div>
-  </div>
-
   <div class="live" id="live">
     <div class="status">
       <span class="dot"></span>
       <span id="status-text">대기 중</span>
     </div>
     <div class="transcript" id="transcript">
-      <span class="placeholder">아래 버튼을 누르고 말해보세요. 예: "스쿼트 100 5개"</span>
+      <span class="placeholder">아래 버튼을 누르고 말해보세요. 예: "110키로 5개"</span>
     </div>
   </div>
 
@@ -121,19 +73,16 @@
     </div>
   </div>
 
-  <div class="log" id="log"></div>
-  <div class="empty" id="empty">아직 기록된 발화가 없습니다.</div>
-
   <div class="tools">
-    <button class="tbtn" type="button" id="btn-export">결과 보기 / 복사</button>
-    <button class="tbtn danger" type="button" id="btn-clear">전체 삭제</button>
+    <button class="tbtn" type="button" id="btn-export">세션 요약 보기 / 복사</button>
+    <button class="tbtn danger" type="button" id="btn-clear">이 루틴 기록 초기화</button>
   </div>
 
   <pre class="export" id="export"></pre>
 
   <p class="note">
-    구글 음성인식(Web Speech API, ko-KR)을 씁니다. 인식된 문장마다 정확/틀림을 눌러 주세요.
-    틀렸으면 실제로 말한 내용을 적으면 인식률에 반영됩니다. 기록은 이 브라우저에 저장되며 페이지를 새로고침해도 남습니다.
+    구글 음성인식(Web Speech API, ko-KR)을 씁니다. 말한 세트가 그대로 기록되고, 위 "명령어" 버튼에서
+    사용 가능한 음성 명령을 확인할 수 있습니다. 기록은 이 브라우저에 저장되며 페이지를 새로고침해도 남습니다.
   </p>
 
 </div>
@@ -276,8 +225,8 @@
           <div class="cmd-desc">해당 종목 상세로 전체 루틴 패널 열기</div>
         </div>
         <div class="cmd-item">
-          <div class="cmd-example">금요일 루틴 시작 / 목요일 루틴으로 시작해줘</div>
-          <div class="cmd-desc">저장된 다른 요일 루틴으로 전환 (요일별 기록은 서로 따로 보존됨)</div>
+          <div class="cmd-example">하체1 루틴 시작 / 상체2 루틴으로 시작해줘</div>
+          <div class="cmd-desc">저장된 다른 파트 루틴으로 전환 (파트별 기록은 서로 따로 보존됨)</div>
         </div>
       </div>
 
@@ -306,7 +255,7 @@
       </div>
 
       <div class="cmd-note">
-        위 예시와 정확히 같은 어순·형식이어야 인식됩니다. 벗어나면 로그에는 남지만 세트에는 반영되지 않아요.
+        위 예시와 정확히 같은 어순·형식이어야 인식됩니다. 벗어나면 화면 트랜스크립트에는 뜨지만 세트에는 반영되지 않아요.
         음성·텍스트 명령 없이도 <strong>완료 체크 버튼</strong>, <strong>전체 루틴 패널의 종목 추가/삭제/이동</strong>으로 클릭만으로 전부 조작할 수 있습니다.
       </div>
 

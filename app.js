@@ -2,9 +2,10 @@
   "use strict";
 
   var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  var STORE = "liftvoice.stt.v1";
 
-  var STORE_SESSION = "liftvoice.session.v1";
+  // v1은 요일 기반 분할(목요일/금요일)이었다. 4분할(상체A/하체A/상체B/하체B)로
+  // 구조가 바뀌어서 옛 localStorage 데이터와 섞이지 않게 키를 올린다.
+  var STORE_SESSION = "liftvoice.session.v2";
   var STORE_TWEAKS = "liftvoice.tweaks.v1";
 
   var tweaks = { vibe: "calm", focus: false, tone: "calm", unit: "kg" };
@@ -70,7 +71,7 @@
 
   function applyTweaks() {
     document.documentElement.setAttribute("data-vibe", tweaks.vibe);
-    document.body.classList.toggle("focus-active", tweaks.focus && state.mode === "session");
+    document.body.classList.toggle("focus-active", tweaks.focus);
   }
 
   function syncTweaksUI() {
@@ -219,84 +220,62 @@
     } catch (e) { /* quota or private mode: keep working in memory */ }
   }
 
-  var SCRIPT_LINES = [
-    "스쿼트 100 5개",
-    "벤치프레스 80 8개",
-    "데드리프트 140 3개",
-    "오버헤드프레스 45 10개",
-    "바벨로우 70 8개",
-    "레그프레스 180 12개",
-    "랫풀다운 60 12개",
-    "덤벨컬 15 12개",
-    "방금 세트 2.5키로 더",
-    "방금 세트 5키로 빼줘",
-    "다음은 덤벨로 대체",
-    "랙 없어서 고블릿 스쿼트로",
-    "지금 힘들어",
-    "휴식 90초",
-    "한 세트 더",
-    "이번 세트 실패",
-    "인클라인 벤치 60 10개",
-    "케이블 플라이 20 15개",
-    "런지 40 10개",
-    "플랭크 60초"
-  ];
-
-  var DEFAULT_ROUTINE_NAME = "목요일";
+  var DEFAULT_ROUTINE_NAME = "상체1";
 
   // 요일별로 따로 저장된 루틴들. 세션을 새로 시작할 때 이 중 하나를
   // 템플릿으로 골라서 state.session.parts를 채운다(실제 진행 상태는
   // 세션 시작 이후 여기와 별개로 저장된다).
+  // 2026-08-03부로 요일 기반 분할(목요일/금요일)에서 4분할(상체1/하체1/상체2/하체2)로
+  // 전환했다. 이름에 A/B 대신 숫자를 쓴 이유: classifyCommand가 인식 문장을
+  // 전부 toLowerCase()하기 때문에 "하체 A"로 지으면 음성/텍스트로 "루틴 전환"을
+  // 말해도 매칭 키가 "하체 a"가 되어 ROUTINE_NAME_LIST의 "하체 A"와 영영 안 맞는다.
+  // 하체1은 그날 실제로 준 루틴을 그대로 옮긴 것 — 이 스키마엔 목표 무게
+  // 필드가 없어서(무게는 항상 음성/입력으로 그때그때 기록), 스쿼트의 웜업·램프·백오프는
+  // "데드리프트 웜업1/웜업2/웜업3/Top Single"과 같은 기존 관례대로 세트를 낱개
+  // 종목으로 쪼개고 참고 무게를 이름에 적어뒀다.
   var ROUTINE_LIBRARY = {
-    "목요일": [
+    "상체1": [
       {
-        name: "어깨",
+        name: "상체1",
         exercises: [
-          { id: "dumbbell_shoulder_press", name: "덤벨 숄더프레스", isMain: true, targetSets: 4, targetReps: 10, restSec: 120 },
-          { id: "face_pull", name: "페이스풀/리어델트", isMain: false, targetSets: 2, targetReps: 20, restSec: 60 },
-          { id: "lateral_raise", name: "사이드 레터럴 레이즈", isMain: false, targetSets: 4, targetReps: 20, restSec: 60 }
-        ]
-      },
-      {
-        name: "등",
-        exercises: [
-          { id: "pulldown", name: "풀다운", isMain: false, targetSets: 4, targetReps: 10, restSec: 90 },
-          { id: "tbar_row", name: "티바로우", isMain: false, targetSets: 5, targetReps: 10, restSec: 90 },
-          { id: "high_row", name: "하이로우", isMain: false, targetSets: 3, targetReps: 10, restSec: 75 },
-          { id: "lat_pulldown", name: "랫풀다운", isMain: true, targetSets: 4, targetReps: 10, restSec: 90 },
-          { id: "one_arm_row", name: "원암 덤벨로우", isMain: false, targetSets: 3, targetReps: 10, restSec: 75 },
-          { id: "seated_cable_row", name: "시티드 케이블 로우", isMain: false, targetSets: 3, targetReps: 12, restSec: 60 }
+          { id: "todo_upper_a", name: "(종목 미입력 — 상체1)", isMain: false, targetSets: 1, targetReps: 1, restSec: 60 }
         ]
       }
     ],
-    "금요일": [
+    "하체1": [
       {
-        name: "데드리프트",
+        name: "하체1",
         exercises: [
-          { id: "deadlift_warmup1", name: "데드리프트 웜업1", isMain: false, targetSets: 1, targetReps: 5, restSec: 90 },
-          { id: "deadlift_warmup2", name: "데드리프트 웜업2", isMain: false, targetSets: 1, targetReps: 3, restSec: 120 },
-          { id: "deadlift_warmup3", name: "데드리프트 웜업3", isMain: false, targetSets: 1, targetReps: 1, restSec: 150 },
-          { id: "deadlift_top_single", name: "데드리프트 Top Single", isMain: true, targetSets: 2, targetReps: 1, restSec: 180 }
+          { id: "squat_warmup1", name: "스쿼트 웜업1 (빈 바)", isMain: false, targetSets: 1, targetReps: 10, restSec: 60 },
+          { id: "squat_warmup2", name: "스쿼트 웜업2 (60kg)", isMain: false, targetSets: 1, targetReps: 5, restSec: 60 },
+          { id: "squat_warmup3", name: "스쿼트 웜업3 (80kg)", isMain: false, targetSets: 1, targetReps: 3, restSec: 90 },
+          { id: "squat_warmup4", name: "스쿼트 웜업4 (100kg)", isMain: false, targetSets: 1, targetReps: 2, restSec: 120 },
+          { id: "squat_set1", name: "스쿼트 세트1 (110kg · 적응)", isMain: false, targetSets: 1, targetReps: 5, restSec: 150 },
+          { id: "squat_set2", name: "스쿼트 세트2 (120kg · 메인, RPE 8.5)", isMain: true, targetSets: 1, targetReps: 5, restSec: 180 },
+          { id: "squat_set3", name: "스쿼트 세트3 (120kg · 메인)", isMain: true, targetSets: 1, targetReps: 5, restSec: 180 },
+          { id: "squat_set4", name: "스쿼트 세트4 (115kg · 볼륨)", isMain: false, targetSets: 1, targetReps: 6, restSec: 150 },
+          { id: "squat_set5", name: "스쿼트 세트5 (100kg · 백오프, 선택)", isMain: false, targetSets: 1, targetReps: 8, restSec: 120 },
+          { id: "stiff_leg_deadlift", name: "스티프 레그드 데드리프트 (60~80kg)", isMain: false, targetSets: 3, targetReps: 12, restSec: 90 },
+          { id: "leg_press", name: "레그 프레스 (120→160→180kg)", isMain: false, targetSets: 4, targetReps: 12, restSec: 90 },
+          { id: "leg_curl_lying", name: "라잉 레그 컬", isMain: false, targetSets: 3, targetReps: 15, restSec: 60 },
+          { id: "leg_extension", name: "레그 익스텐션", isMain: false, targetSets: 3, targetReps: 15, restSec: 60 },
+          { id: "standing_calf_raise", name: "스탠딩 카프 레이즈 (120~200kg)", isMain: false, targetSets: 3, targetReps: 12, restSec: 60 }
         ]
-      },
+      }
+    ],
+    "상체2": [
       {
-        name: "승모근 보조",
+        name: "상체2",
         exercises: [
-          { id: "dumbbell_shrug", name: "덤벨 슈러그", isMain: false, targetSets: 3, targetReps: 15, restSec: 60 }
+          { id: "todo_upper_b", name: "(종목 미입력 — 상체2)", isMain: false, targetSets: 1, targetReps: 1, restSec: 60 }
         ]
-      },
+      }
+    ],
+    "하체2": [
       {
-        name: "코어 & 복근",
+        name: "하체2",
         exercises: [
-          { id: "hanging_leg_raise", name: "행잉 레그레이즈", isMain: false, targetSets: 3, targetReps: 15, restSec: 60 },
-          { id: "lying_leg_raise", name: "라잉 레그레이즈", isMain: false, targetSets: 3, targetReps: 20, restSec: 60 }
-        ]
-      },
-      {
-        name: "팔 보조",
-        exercises: [
-          { id: "cable_triceps_pushdown", name: "케이블 트라이셉 푸쉬다운", isMain: false, targetSets: 3, targetReps: 15, restSec: 60 },
-          { id: "ez_bar_curl", name: "EZ바 컬/덤벨 해머컬", isMain: false, targetSets: 3, targetReps: 15, restSec: 60 }
+          { id: "todo_lower_b", name: "(종목 미입력 — 하체2)", isMain: false, targetSets: 1, targetReps: 1, restSec: 60 }
         ]
       }
     ]
@@ -369,90 +348,6 @@
       }
       return " ";
     });
-  }
-
-  function normalize(text) {
-    var s = String(text == null ? "" : text).toLowerCase();
-    s = stripPunctuation(s);
-    s = s.replace(/kg|km|킬로그램|킬로|키로/g, "키로");
-    s = s.replace(/lbs|lb|파운드/g, "파운드");
-    s = s.replace(/초간|초동안/g, "초");
-    var parts = s.split(/\s+/).filter(function (w) { return w.length > 0; });
-    var originals = parts.slice();
-
-    // Handle counter-attached number words (e.g., "다섯개" → "5개", "백오십키로" → "150키로")
-    parts = parts.map(function (w) {
-      var match = w.match(/^(.+?)(개|초|키로|파운드)$/);
-      if (match) {
-        var prefix = match[1];
-        var counter = match[2];
-        var num = koreanWordToDigitString(prefix);
-        if (num != null) return num + counter;
-        if (/^\d+\.?\d*$/.test(prefix)) {
-          return prefix + counter;
-        }
-      }
-      var whole = koreanWordToDigitString(w);
-      return whole != null ? whole : w;
-    });
-
-    // Combine adjacent number tokens ONLY if both were originally Korean words
-    // Never merge if either has a unit suffix or was originally a digit
-    var combined = [];
-    for (var i = 0; i < parts.length; i++) {
-      if (i < parts.length - 1) {
-        var origCurr = originals[i];
-        var origNext = originals[i + 1];
-
-        // Only merge if BOTH original tokens are Korean words (not digits) with no suffixes
-        var currIsKoreanWord = !/^\d/.test(origCurr);
-        var nextIsKoreanWord = !/^\d/.test(origNext);
-        var currHasSuffix = /[개초키로파운드]$/.test(origCurr);
-        var nextHasSuffix = /[개초키로파운드]$/.test(origNext);
-
-        if (currIsKoreanWord && nextIsKoreanWord && !currHasSuffix && !nextHasSuffix) {
-          var curr = parts[i];
-          var next = parts[i + 1];
-          var currNum = parseInt(curr, 10);
-          var nextNum = parseInt(next, 10);
-
-          if (!isNaN(currNum) && !isNaN(nextNum)) {
-            if (currNum >= 10 && currNum < 100 && currNum % 10 == 0 && nextNum < 10) {
-              combined.push(String(currNum + nextNum));
-              i++;
-              continue;
-            }
-          }
-        }
-      }
-      combined.push(parts[i]);
-    }
-    parts = combined;
-
-    // Merge numeric tokens with following unit suffixes
-    var filtered = [];
-    for (var i = 0; i < parts.length; i++) {
-      var curr = parts[i];
-      var isUnit = curr === "개" || curr === "초" || curr === "키로" || curr === "파운드";
-
-      if (isUnit && filtered.length > 0) {
-        var prev = filtered[filtered.length - 1];
-        var prevNum = parseInt(prev, 10);
-        if (!isNaN(prevNum)) {
-          filtered[filtered.length - 1] = prev + curr;
-          continue;
-        }
-      }
-      filtered.push(curr);
-    }
-    parts = filtered;
-
-    // Join with separator to preserve number boundaries
-    return parts.join("|");
-  }
-
-  function isMatch(expected, heard) {
-    return normalize(expected) === normalize(heard);
   }
 
   function wordsToDigitString(text) {
@@ -556,41 +451,6 @@
     return { type: "UNRECOGNIZED" };
   }
 
-  function selfTest() {
-    var cases = [
-      ["스쿼트 100 5개", "스쿼트 100 5개", true],
-      ["스쿼트 100 5개", "스쿼트 100 5개.", true],
-      ["스쿼트 100 5개", "스쿼트 백 다섯 개", true],
-      ["스쿼트 100 5개", "스쿼트 100 6개", false],
-      ["스쿼트 100 5개", "스쿼드 100 5개", false],
-      ["방금 세트 2.5키로 더", "방금 세트 2.5kg 더", true],
-      ["방금 세트 2.5키로 더", "방금 세트 2.5 킬로 더", true],
-      ["휴식 90초", "휴식 90초", true],
-      ["휴식 90초", "휴식 구십 초", true],
-      ["플랭크 60초", "플랭크 60초간", true],
-      ["지금 힘들어", "지금 힘들어", true],
-      ["지금 힘들어", "지금 힘들어요", false],
-      ["스쿼트 10 25개", "스쿼트 102 5개", false],
-      ["스쿼트 100 5개", "스쿼트 백 다섯개", true],
-      ["오버헤드프레스 45 10개", "오버헤드프레스 마흔 다섯 10개", true],
-      ["벤치프레스 80 8개", "벤치프레스 88", false],
-      ["바벨로우 70 8개", "바벨로우 78", false],
-      ["스쿼트 20 5개", "스쿼트 25", false],
-      ["방금 세트 2.5키로 더", "방금 세트 2 5키로 더", false]
-    ];
-    var pass = 0, fail = 0, failures = [];
-    cases.forEach(function (c) {
-      var got = isMatch(c[0], c[1]);
-      if (got === c[2]) {
-        pass++;
-      } else {
-        fail++;
-        failures.push('"' + c[0] + '" vs "' + c[1] + '" → ' + got + ", 기대 " + c[2]);
-      }
-    });
-    return { pass: pass, fail: fail, failures: failures };
-  }
-
   function selfTestCommands() {
     var cases = [
       ["방금 세트 2.5키로 더", { type: "SET_ADJUST_WEIGHT", amountKg: 2.5, direction: "add" }],
@@ -619,8 +479,8 @@
       ["백삼십오키로 3개", { type: "SET_LOG", weightKg: 135, reps: 3 }],
       ["전체 루틴 보여줘", { type: "ROUTINE_OVERVIEW" }],
       ["오버헤드프레스 몇 세트야", { type: "EXERCISE_QUERY", nameQuery: "오버헤드프레스" }],
-      ["금요일 루틴 시작", { type: "ROUTINE_SWITCH", routineName: "금요일" }],
-      ["목요일 루틴으로 시작해줘", { type: "ROUTINE_SWITCH", routineName: "목요일" }],
+      ["하체2 루틴 시작", { type: "ROUTINE_SWITCH", routineName: "하체2" }],
+      ["하체1 루틴으로 시작해줘", { type: "ROUTINE_SWITCH", routineName: "하체1" }],
       ["아무말 대잔치", { type: "UNRECOGNIZED" }]
     ];
     // 어느 루틴이 활성 상태든 통하도록, 지금 활성 루틴의 파트 이름으로
@@ -646,33 +506,16 @@
 
   var el = {
     banner: document.getElementById("banner"),
-    conds: document.getElementById("conds"),
     live: document.getElementById("live"),
     statusText: document.getElementById("status-text"),
     transcript: document.getElementById("transcript"),
-    log: document.getElementById("log"),
-    empty: document.getElementById("empty"),
     rec: document.getElementById("rec"),
     recLabel: document.getElementById("rec-label"),
-    sTotal: document.getElementById("s-total"),
-    sOk: document.getElementById("s-ok"),
-    sRate: document.getElementById("s-rate"),
-    sCmd: document.getElementById("s-cmd"),
-    sCmdSub: document.getElementById("s-cmd-sub"),
     exportBox: document.getElementById("export"),
     btnExport: document.getElementById("btn-export"),
     btnClear: document.getElementById("btn-clear"),
     typeInput: document.getElementById("type-input"),
     btnTypeSend: document.getElementById("btn-type-send"),
-    modes: document.getElementById("modes"),
-    scriptPanel: document.getElementById("script-panel"),
-    scriptProgress: document.getElementById("script-progress"),
-    scriptLine: document.getElementById("script-line"),
-    scriptResult: document.getElementById("script-result"),
-    scriptActions: document.getElementById("script-actions"),
-    btnSkip: document.getElementById("btn-skip"),
-    btnMisheard: document.getElementById("btn-misheard"),
-    btnMisread: document.getElementById("btn-misread"),
     sessionPanel: document.getElementById("session-panel"),
     sessionPartName: document.getElementById("session-part-name"),
     sessionProgress: document.getElementById("session-progress"),
@@ -704,14 +547,6 @@
   var state = {
     listening: false,     // user intent: should we be capturing
     running: false,       // engine actually running
-    condition: "조용",
-    entries: [],
-    mode: "free",
-    scriptIndex: 0,
-    pendingHeard: "",
-    scriptScored: false,
-    scriptGen: 0,
-    scriptTimer: null,
     session: null,
     routineSessions: {}, // 활성 상태가 아닌 요일 루틴들의 저장된 세션 캐시 (이름 -> 세션)
     // 표시 전용(비영속) 배너 상태. renderSession()이 매 렌더마다 배너를
@@ -729,24 +564,6 @@
   var rec = null;
   var startWatchdog = null;
 
-  /* ---------- persistence ---------- */
-
-  function load() {
-    try {
-      var raw = localStorage.getItem(STORE);
-      if (raw) {
-        var parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) state.entries = parsed;
-      }
-    } catch (e) { /* corrupt or unavailable storage: start empty */ }
-  }
-
-  function save() {
-    try {
-      localStorage.setItem(STORE, JSON.stringify(state.entries));
-    } catch (e) { /* quota or private mode: keep working in memory */ }
-  }
-
   /* ---------- rendering ---------- */
 
   function setStatus(text, hot) {
@@ -762,7 +579,7 @@
 
   function renderTranscript(finalText, interimText) {
     if (!finalText && !interimText) {
-      el.transcript.innerHTML = '<span class="placeholder">아래 버튼을 누르고 말해보세요. 예: "스쿼트 100 5개"</span>';
+      el.transcript.innerHTML = '<span class="placeholder">아래 버튼을 누르고 말해보세요. 예: "110키로 5개"</span>';
       return;
     }
     el.transcript.textContent = "";
@@ -775,217 +592,6 @@
       s.textContent = interimText;
       el.transcript.appendChild(s);
     }
-  }
-
-  var CMD_LABELS = {
-    SET_LOG: "세트 기록",
-    SET_ADJUST_WEIGHT: "무게 수정",
-    SET_ADJUST_REPS: "횟수 수정",
-    COMMENT: "메모",
-    CONDITION: "컨디션",
-    SUBSTITUTE_REQUEST: "대체 요청",
-    TARGET_ADJUST: "목표 세트",
-    NEXT_EXERCISE: "다음 종목",
-    SESSION_END: "운동 종료",
-    ROUTINE_OVERVIEW: "루틴 보기",
-    ROUTINE_SWITCH: "루틴 전환",
-    PART_REMAINING: "파트 확인",
-    EXERCISE_QUERY: "종목 확인",
-    UNRECOGNIZED: "인식 실패"
-  };
-
-  function sessionCommandEntries() {
-    return state.entries.filter(function (e) { return e.cmdType; });
-  }
-
-  // 현장 인식률 요약 + 실패한 문장 전체 목록. 실패 문장이 곧 파서에서
-  // 다음에 고쳐야 할 목록이라, 요약보다 이 목록이 실제로 더 중요하다.
-  function buildCommandStatsLines() {
-    var cmdEntries = sessionCommandEntries();
-    if (!cmdEntries.length) return [];
-
-    var failed = cmdEntries.filter(function (e) { return e.cmdType === "UNRECOGNIZED"; });
-    var understood = cmdEntries.length - failed.length;
-    var lines = [];
-
-    lines.push("=== 현장 명령 인식률 ===");
-    lines.push("세션 발화 " + cmdEntries.length + "개 중 " + understood + "개 해석 성공 (" +
-      Math.round((understood / cmdEntries.length) * 100) + "%)");
-
-    var byType = {};
-    cmdEntries.forEach(function (e) {
-      if (e.cmdType === "UNRECOGNIZED") return;
-      byType[e.cmdType] = (byType[e.cmdType] || 0) + 1;
-    });
-    Object.keys(byType).sort(function (a, b) { return byType[b] - byType[a]; }).forEach(function (type) {
-      lines.push("  " + (CMD_LABELS[type] || type) + ": " + byType[type]);
-    });
-    lines.push("");
-
-    if (failed.length) {
-      lines.push("=== 인식 실패한 발화 (" + failed.length + "개) ===");
-      failed.forEach(function (e, i) {
-        lines.push((i + 1) + ". " + e.time + " (" + e.condition + ") " + e.text);
-      });
-      lines.push("");
-    }
-    return lines;
-  }
-
-  function renderStats() {
-    var rated = state.entries.filter(function (e) { return e.verdict; });
-    var ok = state.entries.filter(function (e) { return e.verdict === "correct"; });
-    el.sTotal.textContent = String(state.entries.length);
-    el.sOk.textContent = String(ok.length);
-    el.sRate.textContent = rated.length
-      ? Math.round((ok.length / rated.length) * 100) + "%"
-      : "—";
-
-    // 현장 명령 해석률: 세션 모드 발화 중 명령으로 해석된 비율.
-    // 수동 판정이 필요 없어서 그냥 운동하기만 하면 저절로 쌓인다.
-    var cmdEntries = sessionCommandEntries();
-    var understood = cmdEntries.filter(function (e) { return e.cmdType !== "UNRECOGNIZED"; });
-    el.sCmd.textContent = cmdEntries.length
-      ? Math.round((understood.length / cmdEntries.length) * 100) + "%"
-      : "—";
-    el.sCmdSub.textContent = cmdEntries.length
-      ? understood.length + "/" + cmdEntries.length
-      : "세션 모드";
-  }
-
-  function renderLog() {
-    el.log.textContent = "";
-    el.empty.style.display = state.entries.length ? "none" : "block";
-
-    state.entries.slice().reverse().forEach(function (entry) {
-      var node = document.createElement("div");
-      node.className = "entry";
-      if (entry.verdict) node.setAttribute("data-verdict", entry.verdict);
-
-      var meta = document.createElement("div");
-      meta.className = "entry-meta";
-      meta.appendChild(document.createTextNode(entry.time + " · " + entry.condition));
-      if (entry.cmdType) {
-        var badge = document.createElement("span");
-        badge.className = "cmd-badge";
-        if (entry.cmdType === "UNRECOGNIZED") badge.setAttribute("data-failed", "true");
-        badge.textContent = CMD_LABELS[entry.cmdType] || entry.cmdType;
-        meta.appendChild(badge);
-      }
-      node.appendChild(meta);
-
-      var text = document.createElement("div");
-      text.className = "entry-text";
-      text.textContent = entry.text;
-      node.appendChild(text);
-
-      if (entry.verdict === "wrong" && entry.truth) {
-        var truth = document.createElement("div");
-        truth.className = "entry-truth";
-        var lbl = document.createElement("span");
-        lbl.className = "lbl";
-        lbl.textContent = "실제";
-        truth.appendChild(lbl);
-        truth.appendChild(document.createTextNode(entry.truth));
-        node.appendChild(truth);
-      }
-
-      var verdict = document.createElement("div");
-      verdict.className = "verdict";
-
-      var okBtn = document.createElement("button");
-      okBtn.type = "button";
-      okBtn.className = "vbtn ok";
-      okBtn.textContent = "정확";
-      okBtn.setAttribute("aria-pressed", entry.verdict === "correct" ? "true" : "false");
-
-      var noBtn = document.createElement("button");
-      noBtn.type = "button";
-      noBtn.className = "vbtn no";
-      noBtn.textContent = "틀림";
-      noBtn.setAttribute("aria-pressed", entry.verdict === "wrong" ? "true" : "false");
-
-      var input = document.createElement("input");
-      input.className = "truth-input";
-      input.type = "text";
-      input.placeholder = "실제로 말한 내용";
-      input.value = entry.truth || "";
-      if (entry.verdict === "wrong") input.classList.add("show");
-
-      okBtn.addEventListener("click", function () {
-        entry.verdict = entry.verdict === "correct" ? null : "correct";
-        entry.truth = "";
-        save();
-        renderLog();
-        renderStats();
-      });
-
-      noBtn.addEventListener("click", function () {
-        entry.verdict = entry.verdict === "wrong" ? null : "wrong";
-        save();
-        renderLog();
-        renderStats();
-      });
-
-      clearOnFocus(input);
-
-      input.addEventListener("input", function () {
-        entry.truth = input.value;
-        save();
-      });
-
-      verdict.appendChild(okBtn);
-      verdict.appendChild(noBtn);
-      node.appendChild(verdict);
-      node.appendChild(input);
-
-      el.log.appendChild(node);
-    });
-  }
-
-  // meta.cmdType: 세션 모드에서 이 발화가 어떤 명령으로 해석됐는지.
-  // 사람이 따로 판정해주지 않아도 쌓이는 객관적 지표라, 현장 인식률은
-  // 이 값으로 계산한다(verdict는 STT가 단어를 제대로 들었는지에 대한
-  // 수동 판정이라 별개다).
-  function addEntry(text, meta) {
-    var trimmed = (text || "").trim();
-    if (!trimmed) return;
-    var now = new Date();
-    var entry = {
-      id: String(now.getTime()) + Math.random().toString(36).slice(2, 6),
-      time: now.toTimeString().slice(0, 8),
-      date: now.toISOString(),
-      condition: state.condition,
-      text: trimmed,
-      verdict: null,
-      truth: ""
-    };
-    if (meta && meta.mode) entry.mode = meta.mode;
-    if (meta && meta.cmdType) entry.cmdType = meta.cmdType;
-    state.entries.push(entry);
-    save();
-    renderLog();
-    renderStats();
-  }
-
-  function renderScript() {
-    el.scriptPanel.classList.toggle("show", state.mode === "script");
-    if (state.mode !== "script") return;
-
-    if (state.scriptIndex >= SCRIPT_LINES.length) {
-      el.scriptLine.textContent = "측정 완료";
-      el.scriptProgress.textContent = SCRIPT_LINES.length + " / " + SCRIPT_LINES.length;
-      el.scriptResult.className = "script-result show";
-      el.scriptResult.textContent = "결과 보기 / 복사를 눌러 결과를 회수하세요.";
-      el.scriptActions.classList.remove("show");
-      return;
-    }
-
-    el.scriptLine.textContent = SCRIPT_LINES[state.scriptIndex];
-    el.scriptProgress.textContent = (state.scriptIndex + 1) + " / " + SCRIPT_LINES.length;
-    el.scriptResult.className = "script-result";
-    el.scriptResult.textContent = "";
-    el.scriptActions.classList.remove("show");
   }
 
   function currentSessionExercise() {
@@ -1008,9 +614,6 @@
   }
 
   function renderSession() {
-    el.sessionPanel.classList.toggle("show", state.mode === "session");
-    if (state.mode !== "session") return;
-
     renderRoutineSelect();
 
     var part = state.session.parts[state.session.currentPart];
@@ -1955,12 +1558,6 @@
       });
     }
 
-    var cmdLines = buildCommandStatsLines();
-    if (cmdLines.length) {
-      lines.push("");
-      lines.push.apply(lines, cmdLines);
-    }
-
     var text = lines.join("\n");
     el.exportBox.textContent = text;
     el.exportBox.classList.add("show");
@@ -1968,73 +1565,9 @@
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(text).then(function () {
         el.btnExport.textContent = "복사됨";
-        setTimeout(function () { el.btnExport.textContent = "결과 보기 / 복사"; }, 1600);
+        setTimeout(function () { el.btnExport.textContent = "세션 요약 보기 / 복사"; }, 1600);
       }, function () { /* clipboard blocked: text is on screen to select */ });
     }
-  }
-
-  function advanceScript() {
-    // Bumping the generation and clearing any pending timer is what makes
-    // a stale auto-advance (Critical 1) and a stale re-read (Critical 2)
-    // harmless: the timer's captured generation and index no longer match,
-    // and a freshly-shown line is unscored again.
-    clearTimeout(state.scriptTimer);
-    state.scriptTimer = null;
-    state.scriptGen++;
-    state.scriptIndex++;
-    state.pendingHeard = "";
-    state.scriptScored = false;
-    renderScript();
-  }
-
-  // 확정 결과를 기대 문장과 대조한다. 일치하면 사용자가 아무것도 하지
-  // 않아도 다음으로 넘어가고, 불일치일 때만 판정을 요구한다.
-  function handleScriptResult(heard) {
-    if (state.scriptIndex >= SCRIPT_LINES.length) return;
-    // Re-entrancy guard (Important 3): once the current line has been
-    // scored, ignore further final results until advanceScript() runs.
-    if (state.scriptScored) return;
-    var expected = SCRIPT_LINES[state.scriptIndex];
-    state.pendingHeard = heard;
-
-    if (isMatch(expected, heard)) {
-      state.scriptScored = true;
-      recordScript(expected, heard, "correct");
-      el.scriptResult.className = "script-result show ok";
-      el.scriptResult.textContent = "일치 ✓";
-      // Critical 2: hide any stale mismatch buttons left over from a
-      // previous mismatched attempt on this same line, so a re-read that
-      // now matches can't be double-recorded via a leftover tap.
-      el.scriptActions.classList.remove("show");
-
-      var expectedIndex = state.scriptIndex;
-      var expectedGen = state.scriptGen;
-      clearTimeout(state.scriptTimer);
-      state.scriptTimer = setTimeout(function () {
-        // Critical 1 (round 1) + round-2 fix: advance whenever nothing has
-        // moved the script on since this timer was scheduled (skip,
-        // mismatch-advance, or another match). Deliberately NOT gated on
-        // state.mode === "script": line N was legitimately scored, so
-        // advancing to N+1 is correct even if the panel is currently
-        // hidden (mode switched to free and never/late returned) — the
-        // advance is invisible while the panel is hidden and simply
-        // reflects reality once the user comes back. Gating on mode was
-        // the round-1 bug: if the user left script mode and the timer
-        // fired while away, the gate suppressed the only call that resets
-        // scriptScored, permanently freezing the line (round-2 Critical).
-        // The index/generation check alone is sufficient to prevent a
-        // stale timer from double-advancing.
-        if (state.scriptIndex === expectedIndex &&
-            state.scriptGen === expectedGen) {
-          advanceScript();
-        }
-      }, 700);
-      return;
-    }
-
-    el.scriptResult.className = "script-result show bad";
-    el.scriptResult.textContent = "인식: " + heard;
-    el.scriptActions.classList.add("show");
   }
 
   function advanceSessionExercise() {
@@ -2056,8 +1589,10 @@
   }
 
   var SESSION_SUBSTITUTES = {
-    overhead_press: { name: "덤벨숄더프레스", why: "덤벨만 있으면 가능, 가동범위 더 큼" },
-    lat_pulldown: { name: "어시스티드 풀업", why: "수직 당기기 궤적 동일" }
+    squat_set2: { name: "고블릿 스쿼트", why: "랙이 막혀 있어도 덤벨만 있으면 가능" },
+    squat_set3: { name: "고블릿 스쿼트", why: "랙이 막혀 있어도 덤벨만 있으면 가능" },
+    leg_press: { name: "핵 스쿼트", why: "레그프레스 자리 없을 때 같은 squat 패턴" },
+    stiff_leg_deadlift: { name: "덤벨 루마니안 데드리프트", why: "바벨 없을 때 같은 hinge 패턴" }
   };
 
   function showSubstituteSuggestion(ex) {
@@ -2189,29 +1724,11 @@
         break;
       }
       default:
-        return; // UNRECOGNIZED — addEntry()로 로그에는 이미 남았음
+        return; // UNRECOGNIZED — 트랜스크립트에만 표시되고 세션 상태는 안 바뀐다
     }
 
     saveSession();
     renderSession();
-  }
-
-  function recordScript(expected, heard, verdict) {
-    var now = new Date();
-    state.entries.push({
-      id: String(now.getTime()) + Math.random().toString(36).slice(2, 6),
-      time: now.toTimeString().slice(0, 8),
-      date: now.toISOString(),
-      condition: state.condition,
-      mode: "script",
-      expected: expected,
-      text: heard,
-      verdict: verdict,
-      truth: verdict === "wrong" ? expected : ""
-    });
-    save();
-    renderLog();
-    renderStats();
   }
 
   // 음성 인식 결과와 텍스트 직접 입력이 완전히 같은 경로를 타게 하는 공용 처리기.
@@ -2220,17 +1737,7 @@
     var finalText = rawText.trim();
     if (!finalText) return;
     renderTranscript(finalText, "");
-    if (state.mode === "script") {
-      handleScriptResult(finalText);
-    } else if (state.mode === "session") {
-      // 한 번만 분류해서 로그와 실행에 같이 쓴다 — 로그에 남은 해석 결과가
-      // 실제로 실행된 것과 어긋나면 인식률 통계가 거짓말을 하게 된다.
-      var cmd = classifyCommand(finalText);
-      addEntry(finalText, { mode: "session", cmdType: cmd.type });
-      handleSessionCommand(finalText, cmd);
-    } else {
-      addEntry(finalText);
-    }
+    handleSessionCommand(finalText);
   }
 
   /* ---------- engine ---------- */
@@ -2376,15 +1883,6 @@
 
   /* ---------- wiring ---------- */
 
-  el.conds.addEventListener("click", function (event) {
-    var btn = event.target.closest(".chip");
-    if (!btn) return;
-    state.condition = btn.getAttribute("data-c");
-    Array.prototype.forEach.call(el.conds.querySelectorAll(".chip"), function (c) {
-      c.setAttribute("aria-pressed", c === btn ? "true" : "false");
-    });
-  });
-
   el.rec.addEventListener("click", toggle);
 
   function submitTypedCommand() {
@@ -2399,29 +1897,6 @@
       submitTypedCommand();
     }
   });
-
-  el.modes.addEventListener("click", function (event) {
-    var btn = event.target.closest(".chip");
-    if (!btn) return;
-    state.mode = btn.getAttribute("data-m");
-    if (state.mode !== "session") stopRestCountdown();
-    applyTweaks();
-    Array.prototype.forEach.call(el.modes.querySelectorAll(".chip"), function (c) {
-      c.setAttribute("aria-pressed", c === btn ? "true" : "false");
-    });
-    renderScript();
-    renderSession();
-  });
-
-  el.btnSkip.addEventListener("click", advanceScript);
-
-  el.btnMisheard.addEventListener("click", function () {
-    recordScript(SCRIPT_LINES[state.scriptIndex], state.pendingHeard, "wrong");
-    advanceScript();
-  });
-
-  // 사용자가 문장을 잘못 읽은 경우는 인식기 성능이 아니므로 집계에서 뺀다.
-  el.btnMisread.addEventListener("click", advanceScript);
 
   el.btnSubApply.addEventListener("click", function () {
     applySubstitute();
@@ -2537,75 +2012,35 @@
     if (document.hidden && state.listening) stop();
   });
 
-  el.btnExport.addEventListener("click", function () {
-    if (state.mode === "session") {
-      renderSessionSummaryExport();
-      return;
-    }
-    if (!state.entries.length) {
-      el.exportBox.textContent = "기록이 없습니다.";
-      el.exportBox.classList.add("show");
-      return;
-    }
-    var lines = [];
-    lines.push("LiftVoice STT 측정 결과");
-    lines.push("생성: " + new Date().toISOString());
-    lines.push("");
+  el.btnExport.addEventListener("click", renderSessionSummaryExport);
 
-    var byCond = {};
-    state.entries.forEach(function (e) {
-      if (!byCond[e.condition]) byCond[e.condition] = [];
-      byCond[e.condition].push(e);
-    });
-
-    lines.push("=== 조건별 요약 ===");
-    Object.keys(byCond).forEach(function (cond) {
-      var group = byCond[cond];
-      var judged = group.filter(function (e) { return e.verdict; });
-      var right = group.filter(function (e) { return e.verdict === "correct"; });
-      var pct = judged.length ? Math.round((right.length / judged.length) * 100) + "%" : "—";
-      lines.push(cond + ": " + right.length + "/" + judged.length + " (" + pct + ")");
-    });
-    lines.push("");
-
-    buildCommandStatsLines().forEach(function (l) { lines.push(l); });
-
-    lines.push("=== 전체 발화 ===");
-    state.entries.forEach(function (e, i) {
-      var mark = e.verdict === "correct" ? "O" : (e.verdict === "wrong" ? "X" : "-");
-      lines.push((i + 1) + ". [" + mark + "] " + e.time + " (" + e.condition + ")");
-      if (e.expected) lines.push("   기대: " + e.expected);
-      lines.push("   인식: " + e.text);
-      if (e.cmdType) lines.push("   해석: " + (CMD_LABELS[e.cmdType] || e.cmdType));
-    });
-    var text = lines.join("\n");
-    el.exportBox.textContent = text;
-    el.exportBox.classList.add("show");
-
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(text).then(function () {
-        el.btnExport.textContent = "복사됨";
-        setTimeout(function () { el.btnExport.textContent = "결과 보기 / 복사"; }, 1600);
-      }, function () { /* clipboard blocked: the text is on screen to select */ });
-    }
-  });
-
+  // 지금 활성 루틴(파트)에서 기록한 세트/메모만 지운다. 다른 루틴이나 종목
+  // 구성은 그대로 둔다 — 다음에 같은 파트를 또 할 때 지난 기록이 안 섞이게
+  // 하는 용도다("운동 종료"는 요약만 내보내고 초기화는 안 하므로 수동으로 누른다).
   el.btnClear.addEventListener("click", function () {
-    if (!state.entries.length) return;
+    var hasData = state.session.parts.some(function (part) {
+      return part.exercises.some(function (ex) { return ex.sets.length || ex.comments.length; });
+    });
+    if (!hasData) return;
     if (el.btnClear.getAttribute("data-armed") === "true") {
-      state.entries = [];
-      save();
-      renderLog();
-      renderStats();
+      state.session.parts.forEach(function (part) {
+        part.exercises.forEach(function (ex) {
+          ex.sets = [];
+          ex.comments = [];
+          ex.setNotes = {};
+        });
+      });
+      saveSession();
+      renderSession();
       el.exportBox.classList.remove("show");
-      el.btnClear.textContent = "전체 삭제";
+      el.btnClear.textContent = "이 루틴 기록 초기화";
       el.btnClear.removeAttribute("data-armed");
       return;
     }
-    el.btnClear.textContent = "정말 삭제? 한 번 더";
+    el.btnClear.textContent = "정말 초기화? 한 번 더";
     el.btnClear.setAttribute("data-armed", "true");
     setTimeout(function () {
-      el.btnClear.textContent = "전체 삭제";
+      el.btnClear.textContent = "이 루틴 기록 초기화";
       el.btnClear.removeAttribute("data-armed");
     }, 3000);
   });
@@ -2613,13 +2048,9 @@
   /* ---------- boot ---------- */
 
   state.session = loadSession();
-  load();
   loadTweaks();
   applyTweaks();
   syncTweaksUI();
-  renderLog();
-  renderStats();
-  renderScript();
   renderSession();
 
   document.getElementById("tweaks-toggle").addEventListener("click", function () {
@@ -2696,13 +2127,11 @@
   }
 
   (function runSelfTests() {
-    var r1 = selfTest();
-    var r2 = selfTestCommands();
-    var totalFail = r1.fail + r2.fail;
-    if (totalFail) {
-      console.error("[LiftVoice] self-test failures:", r1.failures.concat(r2.failures));
+    var r = selfTestCommands();
+    if (r.fail) {
+      console.error("[LiftVoice] self-test failures:", r.failures);
     } else {
-      console.log("[LiftVoice] self-test OK (" + (r1.pass + r2.pass) + " cases)");
+      console.log("[LiftVoice] self-test OK (" + r.pass + " cases)");
     }
   })();
 
